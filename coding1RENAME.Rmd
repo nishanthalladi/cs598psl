@@ -1,0 +1,58 @@
+# Coding Assignment 1
+### Nishanth Alladi (nalladi2), Ethan Cook (elcook3), Davy Ji (davyji2)
+
+```{r}
+
+set.seed(39482342)
+
+csize = 10       # number of centers
+p = 2     # number of dimensions    
+s = 1        # sd for generating the centers within each class                    
+m1 = matrix(rnorm(csize*p), csize, p)*s + cbind( rep(1,csize), rep(0,csize) ) # m1 = all center data for class 1
+m0 = matrix(rnorm(csize*p), csize, p)*s + cbind( rep(0,csize), rep(1,csize) ) # m0 = all center data for class 2
+
+n = 100
+
+# Allocate the n samples for class 1  to the 10 clusters
+id1 = sample(1:csize, n, replace=TRUE)
+# Allocate the n samples for class 1 to the 10 clusters
+id0 = sample(1:csize, n, replace=TRUE)  
+s = sqrt(1/5);              # sd for generating data. 
+
+traindata = matrix(rnorm(2*n*p), 2*n, p)*s + 
+  rbind(m1[id1,], m0[id0,])
+dim(traindata)
+Ytrain = factor(c(rep(1,n), rep(0,n)))
+
+n = 5000
+# Allocate the n samples for class 1  to the 10 clusters
+id1 = sample(1:csize, n, replace=TRUE)
+# Allocate the n samples for class 1 to the 10 clusters
+id0 = sample(1:csize, n, replace=TRUE)  
+
+testdata = matrix(rnorm(2*n*p), 2*n, p)*s + 
+  rbind(m1[id1,], m0[id0,])
+dim(traindata)
+Ytest = factor(c(rep(1,n), rep(0,n)))
+```
+
+```{r}
+n = 100
+plot(traindata[,1], traindata[,2], type="n", xlab="", ylab="")
+points(traindata[1:n,1], traindata[1:n,2], col="blue")
+points(traindata[(n+1):(2*n),1], traindata[(n+1):(2*n),2], col="red")
+points(m1[1:csize,1], m1[1:csize,2], pch="+", cex=1.5, col="blue")
+points(m0[1:csize,1], m0[1:csize,2], pch="+", cex=1.5, col="red");   
+legend("bottomright", pch = c(1,1), col = c("red", "blue"), legend = c("class 1", "class 0"))
+```
+
+```{r}
+# scratch code we were working on
+vectorized_distances = outer(testdata, traindata, FUN = "-")
+distances = sqrt(vectorized_distances[,1,,1]^2 + vectorized_distances[,2,,2]^2)
+sorted_distances_and_indicies = apply(distances, 1, function(x) sort(x, index.return = TRUE))
+k = 5
+closest_k = lapply(1: length(sorted_distances_and_indicies), function (j) sorted_distances_and_indicies[[j]]$ix[1:k] )
+class_distinction = lapply(closest_k, function(x) x > 100)
+class_0 = unlist(lapply(class_distinction, function(x) ifelse(sum(x) == k/2, rnorm(1) > 0, sum(x) > k/2)))
+```
