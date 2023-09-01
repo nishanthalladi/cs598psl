@@ -22,7 +22,9 @@ s = sqrt(1/5);              # sd for generating data.
 traindata = matrix(rnorm(2*n*p), 2*n, p)*s + 
   rbind(m1[id1,], m0[id0,])
 dim(traindata)
-Ytrain = factor(c(rep(1,n), rep(0,n)))
+Ytrain = c(rep(TRUE,n), rep(FALSE,n))
+
+# FALSE is class 0 and TRUE is class 1
 
 n = 5000
 # Allocate the n samples for class 1  to the 10 clusters
@@ -30,10 +32,10 @@ id1 = sample(1:csize, n, replace=TRUE)
 # Allocate the n samples for class 1 to the 10 clusters
 id0 = sample(1:csize, n, replace=TRUE)  
 
-testdata = matrix(rnorm(2*n*p), 2*n, p)*s + 
+ourtestdata = matrix(rnorm(2*n*p), 2*n, p)*s + 
   rbind(m1[id1,], m0[id0,])
 dim(traindata)
-Ytest = factor(c(rep(1,n), rep(0,n)))
+Ytest = c(rep(TRUE,n), rep(FALSE,n))
 ```
 
 ```{r}
@@ -47,12 +49,83 @@ legend("bottomright", pch = c(1,1), col = c("red", "blue"), legend = c("class 1"
 ```
 
 ```{r}
-# scratch code we were working on
-vectorized_distances = outer(testdata, traindata, FUN = "-")
-distances = sqrt(vectorized_distances[,1,,1]^2 + vectorized_distances[,2,,2]^2)
-sorted_distances_and_indicies = apply(distances, 1, function(x) sort(x, index.return = TRUE))
-k = 5
-closest_k = lapply(1: length(sorted_distances_and_indicies), function (j) sorted_distances_and_indicies[[j]]$ix[1:k] )
-class_distinction = lapply(closest_k, function(x) x > 100)
-class_0 = unlist(lapply(class_distinction, function(x) ifelse(sum(x) == k/2, rnorm(1) > 0, sum(x) > k/2)))
+# kNN function
+knn_homemade = function(traindata, ourtestdata, k) {
+  outer_subtraction = outer(ourtestdata, traindata, FUN = "-")
+  distances = sqrt(outer_subtraction[,1,,1]^2 + outer_subtraction[,2,,2]^2)
+  sorted_distances_and_indicies = apply(distances, 1, function(x) sort(x, index.return = TRUE))
+  closest_k = lapply(1: length(sorted_distances_and_indicies), function (j) sorted_distances_and_indicies[[j]]$ix[1:k] )
+  class_distinction = lapply(closest_k, function(x) x < 100)
+  unlist(lapply(class_distinction, function(x) ifelse(sum(x) == k/2, rnorm(1) > 0, sum(x) > k/2)))
+}
 ```
+
+```{r}
+results = knn_homemade(traindata, ourtestdata, 5)
+```
+
+```{r}
+confusion_matrix = function(A, B) {
+  N = length(A)
+  TP = sum((A == B) & A) / N
+  TN = sum((A == B) & !A) / N
+  FP = sum((A != B) & A) / N
+  FN = sum((A != B) & !A) / N
+  matrix(c(c(TP, FP), c(TN, FN)), 2, 2)
+}
+```
+
+```{r}
+testknn = function(k) {
+  cat("k = ", k, "\n")
+  cat("our knn \n")
+  our_output = knn_homemade(traindata, ourtestdata, k)
+  print(confusion_matrix(our_output, Ytest))
+  cat("\n")
+  
+  cat("R's knn \n")
+  r_output = knn(traindata, ourtestdata, Ytrain, k)
+  levels(r_output) = c(FALSE, TRUE)
+  r_output = as.logical(r_output)
+  print(confusion_matrix(r_output, Ytest))
+  cat("\n")
+}
+```
+
+```{r}
+for (k in c(1, 3, 5)){
+  testknn(k)
+}
+```
+
+```{r}
+load("Dan_toydata.RData")
+library(class)
+
+out = knn(traindata, testdata, Ytrain, prob=TRUE, k=5)
+attr(out, "prob") # retrieve prob vector
+```
+
+
+```{r}
+ks = 1:180
+k_folds = 10
+
+data = traindata
+N = nrow(data)
+randomized_indices = sample(1:N)
+buckets = split(randomized_indices, ceiling(seq_along(randomized_indices) / (N / k_folds))) 
+
+for (k in ks) {
+  best_k = 0
+  best_score = 0
+  for (i in 1:k_folds) {
+    test_set = buckets[i]
+    training_set = c(buckets[1:i], buckets[i+1:N / k_folds])
+    knn_homemade(TRAIN, TEST, k)
+  }
+}
+
+
+```
+
