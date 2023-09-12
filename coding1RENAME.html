@@ -521,7 +521,9 @@ for (k in ks) {
   }
 }
 
-output = knn_homemade(traindata, ourtestdata, best_k)
+print(best_k)</code></pre>
+<pre><code>## [1] 2</code></pre>
+<pre class="r"><code>output = knn_homemade(traindata, ourtestdata, best_k)
 print(matrix(c(c(&quot;TP&quot;, &quot;FN&quot;), c(&quot;FP&quot;, &quot;TN&quot;)), 2, 2))</code></pre>
 <pre><code>##      [,1] [,2]
 ## [1,] &quot;TP&quot; &quot;FP&quot;

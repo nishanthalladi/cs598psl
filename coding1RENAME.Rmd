@@ -136,6 +136,7 @@ for (k in ks) {
   }
 }
 
+print(best_k)
 output = knn_homemade(traindata, ourtestdata, best_k)
 print(matrix(c(c("TP", "FN"), c("FP", "TN")), 2, 2))
 print(confusion_matrix(output, Ytest))
