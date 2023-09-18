@@ -1,10 +1,11 @@
 # Coding Assignment 1
 ### Nishanth Alladi (nalladi2), Ethan Cook (elcook3), Davy Ji (davyji2)
 
-### Question 1
-```{r}
+Each member contributed to several pair programming sessions where the entirety of the report was written. Each member contributed to both theorizing solutions and in implementing code.
 
-set.seed(39482342)
+## Part 1
+```{r}
+set.seed(3970)
 
 csize = 10       # number of centers
 p = 2     # number of dimensions    
@@ -49,6 +50,8 @@ points(m0[1:csize,1], m0[1:csize,2], pch="+", cex=1.5, col="red");
 legend("bottomright", pch = c(1,1), col = c("red", "blue"), legend = c("class 1", "class 0"))
 ```
 
+
+## Part 2
 ```{r}
 # kNN function
 knn_homemade = function(traindata, ourtestdata, k) {
@@ -60,7 +63,7 @@ knn_homemade = function(traindata, ourtestdata, k) {
   unlist(lapply(class_distinction, function(x) ifelse(sum(x) == k/2, rnorm(1) > 0, sum(x) > k/2)))
 }
 ```
-
+We handled distance ties by leaving it to R to sort the list and taking the topmost K value. We handled voting ties by using rnorm(1) > 0.
 ```{r}
 results = knn_homemade(traindata, ourtestdata, 5)
 ```
@@ -108,8 +111,7 @@ load("Dan_toydata.RData")
 out = knn(traindata, testdata, Ytrain, prob=TRUE, k=5)
 attr(out, "prob") # retrieve prob vector
 ```
-
-
+## Part 3
 ```{r}
 ks = 1:180
 k_folds = 10
@@ -135,11 +137,13 @@ for (k in ks) {
     best_score = correct_predictions
   }
 }
-
+#Value of selected K
+print(best_k)
 output = knn_homemade(traindata, ourtestdata, best_k)
 print(matrix(c(c("TP", "FN"), c("FP", "TN")), 2, 2))
 print(confusion_matrix(output, Ytest))
 ```
+## Part 4
 ```{r}
 class1 = ourtestdata[1:test_n,]
 class0 = ourtestdata[(test_n+1):(test_n*2),]
@@ -155,3 +159,97 @@ print(matrix(c(c("TP", "FN"), c("FP", "TN")), 2, 2))
 print(confusion_matrix(predictions, Ytest))
 ```
 
+## Part 5
+```{r}
+errorRate = function(A, B) {
+  N = length(A)
+  incorrect = (A!=B)
+  return(sum(incorrect)/N)
+}
+part5 <- function(){
+  # Allocate the n samples for class 1  to the 10 clusters
+  id1 = sample(1:csize, train_n, replace=TRUE)
+  # Allocate the n samples for class 1 to the 10 clusters
+  id0 = sample(1:csize, train_n, replace=TRUE)  
+  s = sqrt(1/5);              # sd for generating data. 
+  
+  traindata = matrix(rnorm(2*train_n*p), 2*train_n, p)*s + 
+    rbind(m1[id1,], m0[id0,])
+  
+  id1 = sample(1:csize, test_n, replace=TRUE)
+  # Allocate the n samples for class 1 to the 10 clusters
+  id0 = sample(1:csize, test_n, replace=TRUE)  
+  
+  ourtestdata = matrix(rnorm(2*test_n*p), 2*test_n, p)*s + 
+    rbind(m1[id1,], m0[id0,])
+  Ytrain = c(rep(TRUE,train_n), rep(FALSE,train_n))
+  Ytest = c(rep(TRUE,test_n), rep(FALSE,test_n))
+  
+  #5.1
+  part1 = knn(traindata, ourtestdata, Ytrain, k=7)
+  p1e = errorRate(part1,Ytest)
+  
+  #5.2
+  ks = 1:180
+  k_folds = 10
+  
+  data = traindata
+  N = nrow(data)
+  randomized_indices = sample(1:N)
+  buckets = split(randomized_indices, ceiling(seq_along(randomized_indices) / (N / k_folds))) 
+  
+  best_k = 0
+  best_score = 0
+  for (k in ks) {
+    correct_predictions = 0
+    for (i in 1:k_folds) {
+      test_set = traindata[unlist(buckets[i], use.names = FALSE),]
+      test_indices = unlist(buckets[i], use.names = FALSE) < 100
+      training_set = traindata[unlist(buckets[-i], use.names = FALSE),]
+      knn_results = knn_homemade(training_set, test_set, k)
+      correct_predictions = sum(test_indices == knn_results) + correct_predictions
+    }
+    if (correct_predictions >= best_score) {
+      best_k = k
+      best_score = correct_predictions
+    }
+  }
+    
+  part2 = knn(traindata, ourtestdata, Ytrain, k=best_k)
+  p2e = errorRate(part2,Ytest)
+  
+  #5.3 bayes
+  class1 = ourtestdata[1:test_n,]
+  class0 = ourtestdata[(test_n+1):(test_n*2),]
+  numerators = 0
+  denominators = 0
+  for (l in 1:10) {
+    numerators = numerators + exp(-rowSums( (ourtestdata - mean(class1[id1 == l])) ^ 2 ) / (2*(s^2)))
+    denominators = denominators + exp(-rowSums( (ourtestdata - mean(class0[id0 == l])) ^ 2 ) / (2*(s^2)))
+  }
+  part3 =(numerators / denominators) >= 1
+  p3e = errorRate(part3,Ytest)
+  
+  return(c(p1e,p2e,p3e, best_k))
+}
+```
+
+
+
+```{r}
+k7 = c()
+kbestk = c()
+bayes = c()
+bestks = c()
+for (i in 1:50){
+  output = part5()
+  k7 = append(k7, output[1])
+  kbestk = append(kbestk, output[2])
+  bayes = append(bayes, output[3])
+  bestks = append(bestks, output[4])
+}
+#the five numbers for the 50 K's
+print(fivenum(bestks))
+
+boxplot(k7,kbestk,bayes, names = c("k = 7", "k = best k from cvknn", "Bayes"))
+```
