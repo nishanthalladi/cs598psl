@@ -1,0 +1,69 @@
+---
+title: "Project1"
+author: "Ethan Cook"
+date: "2023-09-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+train_f1 = read.csv("fold1/train.csv")
+train_f2 = read.csv("fold2/train.csv")
+train_f3 = read.csv("fold3/train.csv")
+train_f4 = read.csv("fold4/train.csv")
+train_f5 = read.csv("fold5/train.csv")
+train_f6 = read.csv("fold6/train.csv")
+train_f7 = read.csv("fold7/train.csv")
+train_f8 = read.csv("fold8/train.csv")
+train_f9 = read.csv("fold9/train.csv")
+train_f10= read.csv("fold10/train.csv")
+
+
+test_f1 = read.csv("fold1/test.csv") 
+test_f2 = read.csv("fold2/test.csv") 
+test_f3 = read.csv("fold3/test.csv") 
+test_f4 = read.csv("fold4/test.csv") 
+test_f5 = read.csv("fold5/test.csv") 
+test_f6 = read.csv("fold6/test.csv") 
+test_f7 = read.csv("fold7/test.csv") 
+test_f8 = read.csv("fold8/test.csv") 
+test_f9 = read.csv("fold9/test.csv") 
+test_f10= read.csv("fold10/test.csv")
+
+
+test_y_f1 = read.csv("fold1/test_y.csv")
+test_y_f2 = read.csv("fold2/test_y.csv")
+test_y_f3 = read.csv("fold3/test_y.csv")
+test_y_f4 = read.csv("fold4/test_y.csv")
+test_y_f5 = read.csv("fold5/test_y.csv")
+test_y_f6 = read.csv("fold6/test_y.csv")
+test_y_f7 = read.csv("fold7/test_y.csv")
+test_y_f8 = read.csv("fold8/test_y.csv")
+test_y_f9 = read.csv("fold9/test_y.csv")
+test_y_f10= read.csv("fold10/test_y.csv")
+
+```
+
+```{r}
+calc_RMSE = function(predictions, actuals)
+{
+  n = length(actuals)
+  sqrt((1 / n) * sum((log(predictions) - log(actuals)) ^ 2))
+}
+
+```
+
+```{r}
+mod = lm (Sale_Price ~ Overall_Cond + Fence + Kitchen_Qual + Fireplaces + Full_Bath, data = train_f1)
+calc_RMSE(mod$fitted.values, train_f1$Sale_Price)
+
+```
+
+
+
+
+
