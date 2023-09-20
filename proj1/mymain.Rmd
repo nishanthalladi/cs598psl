@@ -114,12 +114,64 @@ for(var in categorical.vars){
       }
     colnames(tmp.train) = col.names
     train.matrix = cbind(train.matrix, tmp.train)
-  }
+}
+
 ```
 
 
 
+```{r}
+require(xgboost)
+dtrain <- xgb.DMatrix(data =data.matrix(train.matrix), label = data.matrix(train.y))
+bstSparse <- xgboost(data = dtrain, eta=.05, subsample = .5 , nrounds=5000)
 
+
+colnames(train.matrix)
+
+
+```
+
+```{r}
+
+test.x = subset(test_f1, select = -c(PID) ) # train data without "PID" and "Sale_Price"
+ # log transformed "Sale_Price"
+
+# replace missing by zero
+test.x$Garage_Yr_Blt[is.na(test.x$Garage_Yr_Blt)] = 0
+
+categorical.vars = colnames(test.x)[
+  which(sapply(test.x,
+                 function(x) mode(x)=="character"))]
+
+test.matrix = test.x[, !colnames(test.x) %in% categorical.vars, 
+                          drop=FALSE]
+
+n.test = nrow(test.matrix)
+for(var in categorical.vars){
+    mylevels = sort(unique(test.x[, var]))
+    m = length(mylevels)
+    m = ifelse(m > 2, m, 1)
+    tmp.test = matrix(0, n.test, m)
+    col.names = NULL
+    for(j in 1:m){
+      tmp.test[test.x[, var]==mylevels[j], j] = 1
+      col.names = c(col.names, paste(var, '_', mylevels[j], sep=''))
+      }
+    colnames(tmp.test) = col.names
+    test.matrix = cbind(test.matrix, tmp.test)
+}
+
+colnames(train.matrix)
+
+testonly<- setdiff(colnames(test.matrix), colnames(train.matrix))
+trainonly<- setdiff(colnames(train.matrix), colnames(test.matrix))
+
+df = data.frame(matrix(0, nrow = dim(test.matrix)[1], ncol = length(trainonly))) 
+colnames(df) = trainonly
+
+newdata = cbind(test.matrix, df)
+newnewdata = newdata[ , !(names(newdata) %in% testonly)]
+```
 
 
 
