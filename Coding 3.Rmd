@@ -1,0 +1,58 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(splines)
+
+smooth.matrix.diag = function(x, y, span){
+# return the smoother matrix with knots x and degree of freedom = df
+# this function is for x having unique values
+ n = length(x)
+ A = matrix(0, n, n)
+ for(i in 1:n){
+       y = rep(0, n); y[i]=1
+       yi = loess(y~x, span = span)
+       yip = predict(yi, x)
+       A[,i]= yip
+       }
+ return(diag(((A+t(A))/2)))
+}
+fx = 1:50/50
+
+```
+
+```{r}
+library(readr)
+data = read_csv("C:\\Users\\Kedde\\Downloads\\Coding3_Data.csv")
+x = data$x
+y= data$y
+fit = loess(y~x, span = .2)
+yh = predict(fit, x)
+n= length(x)
+
+min = 99999
+minspan =0
+spans = .15+(1:15)*5/100
+for (span in spans){
+  
+  cv = 0
+  S = smooth.matrix.diag(x,y, span=span)
+  for (i in 1:n){
+    cv =cv+((y[i]-yh[i])/(1-S[i]))^2
+  }
+  cv = cv/n
+  if(cv<min){
+    min =cv
+    minspan = span
+  }
+}
+print(min)
+print(minspan)
+
+```
+
+
+
+
