@@ -1,0 +1,179 @@
+---
+title: "Project1"
+author: "Ethan Cook"
+date: "2023-09-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+train_f1 = read.csv("fold1/train.csv")
+train_f2 = read.csv("fold2/train.csv")
+train_f3 = read.csv("fold3/train.csv")
+train_f4 = read.csv("fold4/train.csv")
+train_f5 = read.csv("fold5/train.csv")
+train_f6 = read.csv("fold6/train.csv")
+train_f7 = read.csv("fold7/train.csv")
+train_f8 = read.csv("fold8/train.csv")
+train_f9 = read.csv("fold9/train.csv")
+train_f10= read.csv("fold10/train.csv")
+
+
+test_f1 = read.csv("fold1/test.csv") 
+test_f2 = read.csv("fold2/test.csv") 
+test_f3 = read.csv("fold3/test.csv") 
+test_f4 = read.csv("fold4/test.csv") 
+test_f5 = read.csv("fold5/test.csv") 
+test_f6 = read.csv("fold6/test.csv") 
+test_f7 = read.csv("fold7/test.csv") 
+test_f8 = read.csv("fold8/test.csv") 
+test_f9 = read.csv("fold9/test.csv") 
+test_f10= read.csv("fold10/test.csv")
+
+
+test_y_f1 = read.csv("fold1/test_y.csv")
+test_y_f2 = read.csv("fold2/test_y.csv")
+test_y_f3 = read.csv("fold3/test_y.csv")
+test_y_f4 = read.csv("fold4/test_y.csv")
+test_y_f5 = read.csv("fold5/test_y.csv")
+test_y_f6 = read.csv("fold6/test_y.csv")
+test_y_f7 = read.csv("fold7/test_y.csv")
+test_y_f8 = read.csv("fold8/test_y.csv")
+test_y_f9 = read.csv("fold9/test_y.csv")
+test_y_f10= read.csv("fold10/test_y.csv")
+
+```
+
+```{r}
+calc_RMSE = function(predictions, actuals)
+{
+  n = length(actuals)
+  sqrt((1 / n) * sum((log(predictions) - log(actuals)) ^ 2))
+}
+
+```
+
+```{r}
+mod = lm (Sale_Price ~ Overall_Cond + Fence + Kitchen_Qual + Fireplaces + Full_Bath, data = train_f1)
+calc_RMSE(mod$fitted.values, train_f1$Sale_Price)
+```
+
+```{r}
+train_f1 = subset(train_f1, select = -c(Street, Utilities, Condition_2, Roof_Matl, Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF, Pool_Area, Longitude, Latitude) )
+```
+
+```{r}
+library(DescTools)
+
+train_f1$Lot_Frontage = Winsorize(train_f1$Lot_Frontage, minval = 0)
+train_f1$Lot_Area = Winsorize(train_f1$Lot_Area, minval = 0)
+train_f1$Mas_Vnr_Area = Winsorize(train_f1$Mas_Vnr_Area, minval = 0)
+train_f1$BsmtFin_SF_2 = Winsorize(train_f1$BsmtFin_SF_2, minval = 0)
+train_f1$Bsmt_Unf_SF = Winsorize(train_f1$Bsmt_Unf_SF, minval = 0)
+train_f1$Total_Bsmt_SF = Winsorize(train_f1$Total_Bsmt_SF, minval = 0)
+train_f1$Second_Flr_SF = Winsorize(train_f1$Second_Flr_SF, minval = 0)
+train_f1$First_Flr_SF = Winsorize(train_f1$First_Flr_SF, minval = 0)
+train_f1$Gr_Liv_Area = Winsorize(train_f1$Gr_Liv_Area, minval = 0)
+train_f1$Garage_Area = Winsorize(train_f1$Garage_Area, minval = 0)
+train_f1$Wood_Deck_SF = Winsorize(train_f1$Wood_Deck_SF, minval = 0)
+train_f1$Open_Porch_SF = Winsorize(train_f1$Open_Porch_SF, minval = 0)
+train_f1$Enclosed_Porch = Winsorize(train_f1$Enclosed_Porch, minval = 0)
+train_f1$Three_season_porch = Winsorize(train_f1$Three_season_porch, minval = 0)
+train_f1$Screen_Porch = Winsorize(train_f1$Screen_Porch, minval = 0)
+train_f1$Misc_Val = Winsorize(train_f1$Misc_Val, minval = 0)
+```
+
+```{r}
+train.x = subset(train_f1, select = -c(PID, Sale_Price) ) # train data without "PID" and "Sale_Price"
+train.y = log(train_f1$Sale_Price) # log transformed "Sale_Price"
+
+# replace missing by zero
+train.x$Garage_Yr_Blt[is.na(train.x$Garage_Yr_Blt)] = 0
+
+categorical.vars = colnames(train.x)[
+  which(sapply(train.x,
+                 function(x) mode(x)=="character"))]
+
+train.matrix = train.x[, !colnames(train.x) %in% categorical.vars, 
+                          drop=FALSE]
+
+n.train = nrow(train.matrix)
+for(var in categorical.vars){
+    mylevels = sort(unique(train.x[, var]))
+    m = length(mylevels)
+    m = ifelse(m > 2, m, 1)
+    tmp.train = matrix(0, n.train, m)
+    col.names = NULL
+    for(j in 1:m){
+      tmp.train[train.x[, var]==mylevels[j], j] = 1
+      col.names = c(col.names, paste(var, '_', mylevels[j], sep=''))
+      }
+    colnames(tmp.train) = col.names
+    train.matrix = cbind(train.matrix, tmp.train)
+}
+
+```
+
+
+
+```{r}
+require(xgboost)
+dtrain <- xgb.DMatrix(data =data.matrix(train.matrix), label = data.matrix(train.y))
+bstSparse <- xgboost(data = dtrain, eta=.05, subsample = .5 , nrounds=5000)
+
+
+colnames(train.matrix)
+
+
+```
+
+```{r}
+
+test.x = subset(test_f1, select = -c(PID) ) # train data without "PID" and "Sale_Price"
+ # log transformed "Sale_Price"
+
+# replace missing by zero
+test.x$Garage_Yr_Blt[is.na(test.x$Garage_Yr_Blt)] = 0
+
+categorical.vars = colnames(test.x)[
+  which(sapply(test.x,
+                 function(x) mode(x)=="character"))]
+
+test.matrix = test.x[, !colnames(test.x) %in% categorical.vars, 
+                          drop=FALSE]
+
+n.test = nrow(test.matrix)
+for(var in categorical.vars){
+    mylevels = sort(unique(test.x[, var]))
+    m = length(mylevels)
+    m = ifelse(m > 2, m, 1)
+    tmp.test = matrix(0, n.test, m)
+    col.names = NULL
+    for(j in 1:m){
+      tmp.test[test.x[, var]==mylevels[j], j] = 1
+      col.names = c(col.names, paste(var, '_', mylevels[j], sep=''))
+      }
+    colnames(tmp.test) = col.names
+    test.matrix = cbind(test.matrix, tmp.test)
+}
+
+colnames(train.matrix)
+
+testonly<- setdiff(colnames(test.matrix), colnames(train.matrix))
+trainonly<- setdiff(colnames(train.matrix), colnames(test.matrix))
+
+df = data.frame(matrix(0, nrow = dim(test.matrix)[1], ncol = length(trainonly))) 
+colnames(df) = trainonly
+
+newdata = cbind(test.matrix, df)
+newnewdata = newdata[ , !(names(newdata) %in% testonly)]
+```
+
+
+
+
+

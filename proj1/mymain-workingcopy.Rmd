@@ -10,9 +10,45 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-# TODO
-train = read.csv("fold1/train.csv")
-test = read.csv("fold1/test.csv") 
+
+train_f1 = read.csv("fold1/train.csv", stringsAsFactors = FALSE)
+train_f2 = read.csv("fold2/train.csv", stringsAsFactors = FALSE)
+train_f3 = read.csv("fold3/train.csv", stringsAsFactors = FALSE)
+train_f4 = read.csv("fold4/train.csv", stringsAsFactors = FALSE)
+train_f5 = read.csv("fold5/train.csv", stringsAsFactors = FALSE)
+train_f6 = read.csv("fold6/train.csv", stringsAsFactors = FALSE)
+train_f7 = read.csv("fold7/train.csv", stringsAsFactors = FALSE)
+train_f8 = read.csv("fold8/train.csv", stringsAsFactors = FALSE)
+train_f9 = read.csv("fold9/train.csv", stringsAsFactors = FALSE)
+train_f10 = read.csv("fold10/train.csv", stringsAsFactors = FALSE)
+
+
+test_f1 = read.csv("fold1/test.csv", stringsAsFactors = FALSE) 
+test_f2 = read.csv("fold2/test.csv", stringsAsFactors = FALSE) 
+test_f3 = read.csv("fold3/test.csv", stringsAsFactors = FALSE) 
+test_f4 = read.csv("fold4/test.csv", stringsAsFactors = FALSE) 
+test_f5 = read.csv("fold5/test.csv", stringsAsFactors = FALSE) 
+test_f6 = read.csv("fold6/test.csv", stringsAsFactors = FALSE) 
+test_f7 = read.csv("fold7/test.csv", stringsAsFactors = FALSE) 
+test_f8 = read.csv("fold8/test.csv", stringsAsFactors = FALSE) 
+test_f9 = read.csv("fold9/test.csv", stringsAsFactors = FALSE) 
+test_f10= read.csv("fold10/test.csv", stringsAsFactors = FALSE)
+
+
+test_y_f1 = read.csv("fold1/test_y.csv", stringsAsFactors = FALSE)
+test_y_f2 = read.csv("fold2/test_y.csv", stringsAsFactors = FALSE)
+test_y_f3 = read.csv("fold3/test_y.csv", stringsAsFactors = FALSE)
+test_y_f4 = read.csv("fold4/test_y.csv", stringsAsFactors = FALSE)
+test_y_f5 = read.csv("fold5/test_y.csv", stringsAsFactors = FALSE)
+test_y_f6 = read.csv("fold6/test_y.csv", stringsAsFactors = FALSE)
+test_y_f7 = read.csv("fold7/test_y.csv", stringsAsFactors = FALSE)
+test_y_f8 = read.csv("fold8/test_y.csv", stringsAsFactors = FALSE)
+test_y_f9 = read.csv("fold9/test_y.csv", stringsAsFactors = FALSE)
+test_y_f10= read.csv("fold10/test_y.csv", stringsAsFactors = FALSE)
+
+train = train_f7
+test = test_f7
+test_y = test_y_f7
 
 ```
 
@@ -137,20 +173,21 @@ test.matrix = test.matrix[order(names(test.matrix))]
 
 ```{r}
 dtest <- xgb.DMatrix(data = data.matrix(test.matrix))
-pred_y = round(exp(predict(bstSparse, dtest)), 1)
+pred_y = predict(bstSparse, dtest)
+
+calc_RMSE(exp(pred_y), test_y$Sale_Price)
+```
+
+
+```{r}
+library(glmnet)
+cvfit = cv.glmnet(as.matrix(train.matrix), train.y, alpha = 0.2)
+pred_y = as.vector(exp(predict(cvfit, as.matrix(test.matrix))))
+
+calc_RMSE(pred_y, test_y$Sale_Price)
 ```
 
 ```{r}
-idxs = 1:length(pred_y)
-pids = train$PID
-file_strings = sapply(idxs, function(idx) {paste(pids[idx], pred_y[idx], sep= ", ")} )
-fileConn <- file("submission1.txt")
-file_strings = c("PID, Sale_Price", file_strings)
-writeLines(file_strings, fileConn)
-close(fileConn)
+
 ```
-
-
-
-
 
