@@ -9,8 +9,21 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+### Error calculation function
 ```{r}
+library(DescTools)
+library(fastDummies)
 
+calc_RMSE = function(predictions, actuals)
+{
+  n = length(actuals)
+  sqrt((1 / n) * sum((log(predictions) - log(actuals)) ^ 2))
+}
+
+```
+
+### Load train data
+```{r}
 train_f1 = read.csv("fold1/train.csv", stringsAsFactors = FALSE)
 train_f2 = read.csv("fold2/train.csv", stringsAsFactors = FALSE)
 train_f3 = read.csv("fold3/train.csv", stringsAsFactors = FALSE)
@@ -22,7 +35,64 @@ train_f8 = read.csv("fold8/train.csv", stringsAsFactors = FALSE)
 train_f9 = read.csv("fold9/train.csv", stringsAsFactors = FALSE)
 train_f10 = read.csv("fold10/train.csv", stringsAsFactors = FALSE)
 
+train = train_f7 # TODO remove after testing
+```
 
+### Remove unwanted predictors from train
+```{r}
+train = subset(train, select = -c(Street, Utilities, Condition_2, Roof_Matl, Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF, Pool_Area, Longitude, Latitude) )
+```
+
+### Winzorize train data
+```{r}
+train$Lot_Frontage = Winsorize(train$Lot_Frontage, minval = 0)
+train$Lot_Area = Winsorize(train$Lot_Area, minval = 0)
+train$Mas_Vnr_Area = Winsorize(train$Mas_Vnr_Area, minval = 0)
+train$BsmtFin_SF_2 = Winsorize(train$BsmtFin_SF_2, minval = 0)
+train$Bsmt_Unf_SF = Winsorize(train$Bsmt_Unf_SF, minval = 0)
+train$Total_Bsmt_SF = Winsorize(train$Total_Bsmt_SF, minval = 0)
+train$Second_Flr_SF = Winsorize(train$Second_Flr_SF, minval = 0)
+train$First_Flr_SF = Winsorize(train$First_Flr_SF, minval = 0)
+train$Gr_Liv_Area = Winsorize(train$Gr_Liv_Area, minval = 0)
+train$Garage_Area = Winsorize(train$Garage_Area, minval = 0)
+train$Wood_Deck_SF = Winsorize(train$Wood_Deck_SF, minval = 0)
+train$Open_Porch_SF = Winsorize(train$Open_Porch_SF, minval = 0)
+train$Enclosed_Porch = Winsorize(train$Enclosed_Porch, minval = 0)
+train$Three_season_porch = Winsorize(train$Three_season_porch, minval = 0)
+train$Screen_Porch = Winsorize(train$Screen_Porch, minval = 0)
+train$Misc_Val = Winsorize(train$Misc_Val, minval = 0)
+```
+
+```{r}
+categoricalize = function(dataset)
+{
+  data.x = subset(dataset, select = -c(PID) ) # data without "PID" and "Sale_Price"
+  
+  # replace missing by zero
+  data.x$Garage_Yr_Blt[is.na(data.x$Garage_Yr_Blt)] = 0
+  
+  categorical.vars = colnames(data.x)[
+    which(sapply(data.x,
+                   function(x) mode(x)=="character"))]
+  
+  data.dummy.cols = dummy_cols(data.x, select_columns = categorical.vars, remove_selected_columns = TRUE)
+  
+  processed.matrix = data.dummy.cols[order(names(data.dummy.cols))]
+  processed.matrix
+}
+```
+
+
+### Process categorical train data
+```{r}
+train.y = log(train$Sale_Price) # log transformed "Sale_Price"
+train.x = categoricalize(subset(train, select = -c(Sale_Price) ))
+train.names = colnames(train.x)
+```
+
+
+### Load test data
+```{r}
 test_f1 = read.csv("fold1/test.csv", stringsAsFactors = FALSE) 
 test_f2 = read.csv("fold2/test.csv", stringsAsFactors = FALSE) 
 test_f3 = read.csv("fold3/test.csv", stringsAsFactors = FALSE) 
@@ -46,148 +116,69 @@ test_y_f8 = read.csv("fold8/test_y.csv", stringsAsFactors = FALSE)
 test_y_f9 = read.csv("fold9/test_y.csv", stringsAsFactors = FALSE)
 test_y_f10= read.csv("fold10/test_y.csv", stringsAsFactors = FALSE)
 
-train = train_f7
 test = test_f7
-test_y = test_y_f7
+test_y = test_y_f7 # TODO remove after testing
+```
+
+### Process categorical test data
+```{r}
+test.x = categoricalize(test)
+test.names = colnames(test.x)
+
+# train.names was saved during train data processing
+testonly <- setdiff(test.names, train.names)
+trainonly <- setdiff(train.names, test.names)
+
+df = data.frame(matrix(0, nrow = dim(test.x)[1], ncol = length(trainonly)))
+colnames(df) = trainonly
+
+all_columns = cbind(test.x, df)
+test.x = all_columns[ , !(names(all_columns) %in% testonly)]
+test.x = test.x[order(names(test.x))]
+```
+
+# Linear Regression Model
+
+```{r}
+library(glmnet)
+
+# Just elastic net
+cvfit = cv.glmnet(as.matrix(train.x), train.y, alpha = 0.2)
+pred_y = as.vector(exp(predict(cvfit, as.matrix(test.x))))
+
+print(calc_RMSE(pred_y, test_y$Sale_Price))
+```
+
+
+```{r}
+# Just Ridge
+cvfit = cv.glmnet(as.matrix(train.x), train.y, alpha = 0, family='gaussian')
+pred_y = as.vector(exp(predict(cvfit, as.matrix(test.x))))
+
+print(calc_RMSE(pred_y, test_y$Sale_Price))
 
 ```
 
 ```{r}
-calc_RMSE = function(predictions, actuals)
-{
-  n = length(actuals)
-  sqrt((1 / n) * sum((log(predictions) - log(actuals)) ^ 2))
-}
+# Just Lasso
+cvfit = cv.glmnet(as.matrix(train.x), train.y, alpha = 1)
+pred_y = as.vector(exp(predict(cvfit, as.matrix(test.x))))
 
+print(calc_RMSE(pred_y, test_y$Sale_Price))
 ```
 
-```{r}
-mod = lm (Sale_Price ~ Overall_Cond + Fence + Kitchen_Qual + Fireplaces + Full_Bath, data = train)
-calc_RMSE(mod$fitted.values, train$Sale_Price)
-```
-
-```{r}
-train = subset(train, select = -c(Street, Utilities, Condition_2, Roof_Matl, Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF, Pool_Area, Longitude, Latitude) )
-```
-
-```{r}
-library(DescTools)
-
-train$Lot_Frontage = Winsorize(train$Lot_Frontage, minval = 0)
-train$Lot_Area = Winsorize(train$Lot_Area, minval = 0)
-train$Mas_Vnr_Area = Winsorize(train$Mas_Vnr_Area, minval = 0)
-train$BsmtFin_SF_2 = Winsorize(train$BsmtFin_SF_2, minval = 0)
-train$Bsmt_Unf_SF = Winsorize(train$Bsmt_Unf_SF, minval = 0)
-train$Total_Bsmt_SF = Winsorize(train$Total_Bsmt_SF, minval = 0)
-train$Second_Flr_SF = Winsorize(train$Second_Flr_SF, minval = 0)
-train$First_Flr_SF = Winsorize(train$First_Flr_SF, minval = 0)
-train$Gr_Liv_Area = Winsorize(train$Gr_Liv_Area, minval = 0)
-train$Garage_Area = Winsorize(train$Garage_Area, minval = 0)
-train$Wood_Deck_SF = Winsorize(train$Wood_Deck_SF, minval = 0)
-train$Open_Porch_SF = Winsorize(train$Open_Porch_SF, minval = 0)
-train$Enclosed_Porch = Winsorize(train$Enclosed_Porch, minval = 0)
-train$Three_season_porch = Winsorize(train$Three_season_porch, minval = 0)
-train$Screen_Porch = Winsorize(train$Screen_Porch, minval = 0)
-train$Misc_Val = Winsorize(train$Misc_Val, minval = 0)
-```
-
-```{r}
-train.x = subset(train, select = -c(PID, Sale_Price) ) # train data without "PID" and "Sale_Price"
-train.y = log(train$Sale_Price) # log transformed "Sale_Price"
-
-# replace missing by zero
-train.x$Garage_Yr_Blt[is.na(train.x$Garage_Yr_Blt)] = 0
-
-categorical.vars = colnames(train.x)[
-  which(sapply(train.x,
-                 function(x) mode(x)=="character"))]
-
-train.matrix = train.x[, !colnames(train.x) %in% categorical.vars, 
-                          drop=FALSE]
-
-n.train = nrow(train.matrix)
-for(var in categorical.vars){
-    mylevels = sort(unique(train.x[, var]))
-    m = length(mylevels)
-    m = ifelse(m > 2, m, 1)
-    tmp.train = matrix(0, n.train, m)
-    col.names = NULL
-    for(j in 1:m){
-      tmp.train[train.x[, var]==mylevels[j], j] = 1
-      col.names = c(col.names, paste(var, '_', mylevels[j], sep=''))
-      }
-    colnames(tmp.train) = col.names
-    train.matrix = cbind(train.matrix, tmp.train)
-}
-train.matrix = train.matrix[order(names(train.matrix))]
-```
-
-
-
+# XGBoost model
 ```{r, results = 'hide'}
 require(xgboost)
-dtrain <- xgb.DMatrix(data =data.matrix(train.matrix), label = data.matrix(train.y))
+dtrain <- xgb.DMatrix(data =data.matrix(train.x), label = data.matrix(train.y))
 bstSparse <- xgboost(data = dtrain, eta=.05, subsample = .5 , nrounds=5000)
 ```
 
 ```{r}
-test.x = subset(test, select = -c(PID) ) # train data without "PID" and "Sale_Price"
- # log transformed "Sale_Price"
-
-# replace missing by zero
-test.x$Garage_Yr_Blt[is.na(test.x$Garage_Yr_Blt)] = 0
-
-categorical.vars = colnames(test.x)[
-  which(sapply(test.x,
-                 function(x) mode(x)=="character"))]
-
-test.matrix = test.x[, !colnames(test.x) %in% categorical.vars, 
-                          drop=FALSE]
-
-n.test = nrow(test.matrix)
-for(var in categorical.vars){
-    mylevels = sort(unique(test.x[, var]))
-    m = length(mylevels)
-    m = ifelse(m > 2, m, 1)
-    tmp.test = matrix(0, n.test, m)
-    col.names = NULL
-    for(j in 1:m){
-      tmp.test[test.x[, var]==mylevels[j], j] = 1
-      col.names = c(col.names, paste(var, '_', mylevels[j], sep=''))
-      }
-    colnames(tmp.test) = col.names
-    test.matrix = cbind(test.matrix, tmp.test)
-}
-
-testonly <- setdiff(colnames(test.matrix), colnames(train.matrix))
-trainonly <- setdiff(colnames(train.matrix), colnames(test.matrix))
-
-df = data.frame(matrix(0, nrow = dim(test.matrix)[1], ncol = length(trainonly))) 
-colnames(df) = trainonly
-
-all_columns = cbind(test.matrix, df)
-test.matrix = all_columns[ , !(names(all_columns) %in% testonly)]
-
-test.matrix = test.matrix[order(names(test.matrix))]
-```
-
-```{r}
-dtest <- xgb.DMatrix(data = data.matrix(test.matrix))
+dtest <- xgb.DMatrix(data = data.matrix(test.x))
 pred_y = predict(bstSparse, dtest)
 
 calc_RMSE(exp(pred_y), test_y$Sale_Price)
 ```
 
-
-```{r}
-library(glmnet)
-cvfit = cv.glmnet(as.matrix(train.matrix), train.y, alpha = 0.2)
-pred_y = as.vector(exp(predict(cvfit, as.matrix(test.matrix))))
-
-calc_RMSE(pred_y, test_y$Sale_Price)
-```
-
-```{r}
-
-```
 
