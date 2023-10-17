@@ -43,6 +43,30 @@ train = train_f7 # TODO remove after testing
 train = subset(train, select = -c(Street, Utilities, Condition_2, Roof_Matl, Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF, Pool_Area, Longitude, Latitude) )
 ```
 
+```{r}
+categorical.vars = colnames(train)[
+    which(sapply(train,
+                   function(x) mode(x)=="character"))]
+
+cat_only = subset(train, select=c(categorical.vars))
+modes_ = apply(cat_only, 2, Mode)
+
+removeable_cols = c()
+for(i in 1:ncol(cat_only))
+{
+  n = nrow(cat_only)
+  sum_of_modes = sum(cat_only[,i] == modes_[i])
+  if(sum_of_modes / n > 0.95)
+  {
+    removeable_cols = c(removeable_cols, i)
+  }
+}
+
+removeable_names = colnames(cat_only[removeable_cols])
+train = train[,!(colnames(train)) %in% removeable_names]
+```
+
+
 ### Winzorize train data
 ```{r}
 train$Lot_Frontage = Winsorize(train$Lot_Frontage, minval = 0)
@@ -135,6 +159,8 @@ colnames(df) = trainonly
 all_columns = cbind(test.x, df)
 test.x = all_columns[ , !(names(all_columns) %in% testonly)]
 test.x = test.x[order(names(test.x))]
+
+set.seed(1776)
 ```
 
 # Linear Regression Model
@@ -143,10 +169,28 @@ test.x = test.x[order(names(test.x))]
 library(glmnet)
 
 # Just elastic net
-cvfit = cv.glmnet(as.matrix(train.x), train.y, alpha = 0.2)
+cvfit = cv.glmnet(as.matrix(train.x), train.y, alpha = 0.5)
 pred_y = as.vector(exp(predict(cvfit, as.matrix(test.x))))
 
 print(calc_RMSE(pred_y, test_y$Sale_Price))
+```
+
+```{r}
+# Lasso variable selection
+cvfit = cv.glmnet(as.matrix(train.x), train.y, alpha = 1)
+
+reduced_predictors = names(coef(cvfit)[rowSums(coeffs) != 0, ])
+reduced_predictors = reduced_predictors[-1]
+
+pred_y = as.vector(exp(predict(cvfit, as.matrix(test.x))))
+print(calc_RMSE(pred_y, test_y$Sale_Price))
+
+# Ridge based off Lasso var selection
+cvfit = cv.glmnet(as.matrix(subset(train.x, select = c(reduced_predictors))), train.y, alpha = 0, family='gaussian')
+pred_y = as.vector(exp(predict(cvfit, as.matrix(subset(test.x, select = c(reduced_predictors))))))
+
+print(calc_RMSE(pred_y, test_y$Sale_Price))
+
 ```
 
 
@@ -159,13 +203,7 @@ print(calc_RMSE(pred_y, test_y$Sale_Price))
 
 ```
 
-```{r}
-# Just Lasso
-cvfit = cv.glmnet(as.matrix(train.x), train.y, alpha = 1)
-pred_y = as.vector(exp(predict(cvfit, as.matrix(test.x))))
 
-print(calc_RMSE(pred_y, test_y$Sale_Price))
-```
 
 # XGBoost model
 ```{r, results = 'hide'}
