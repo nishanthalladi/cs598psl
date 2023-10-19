@@ -13,14 +13,12 @@ knitr::opts_chunk$set(echo = TRUE)
 # TODO
 train = read.csv("fold1/train.csv")
 test = read.csv("fold1/test.csv") 
-
 ```
 
 ```{r}
 calc_RMSE = function(predictions, actuals)
 {
-  n = length(actuals)
-  sqrt((1 / n) * sum((log(predictions) - log(actuals)) ^ 2))
+  sqrt(mean((predictions - actuals) ^ 2))
 }
 
 ```

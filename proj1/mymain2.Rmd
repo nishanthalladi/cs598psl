@@ -1,0 +1,165 @@
+---
+title: "Project1"
+author: "Ethan Cook"
+date: "2023-09-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(glmnet)
+```
+
+```{r}
+train = read.csv("fold9/train.csv", stringsAsFactors = FALSE)
+test = read.csv("fold9/test.csv", stringsAsFactors = FALSE) 
+test_y = read.csv('fold9/test_y.csv', stringsAsFactors = FALSE)
+```
+
+```{r}
+calc_RMSE = function(predictions, actuals)
+{ 
+  sqrt(mean((predictions - actuals) ^ 2)) 
+}
+```
+
+### Cleaning Specific Columns
+
+```{r}
+# Removing
+train$BsmtFin_SF_2 = NULL
+train$Low_Qual_Fin_SF = NULL
+train$Three_season_porch = NULL
+train$Pool_Area = NULL
+train$Misc_Val = NULL
+train$Street = NULL
+train$Utilities = NULL
+train$Condition_2 = NULL
+train$Roof_Matl = NULL 
+train$Heating = NULL
+train$Pool_QC = NULL
+train$Misc_Feature = NULL
+train$Garage_Yr_Blt = NULL
+train$Exterior_2nd = NULL
+train$Mo_Sold = NULL
+train$Fence = NULL
+```
+
+```{r}
+winsorize = function(variable, M=quantile(variable, probs=c(0.95))) {
+  variable[variable > M] = M
+  variable
+}
+```
+
+### Winsorizing Train
+```{r}
+train$Lot_Frontage = winsorize(train$Lot_Frontage)
+Lot_Frontage_M = max(train$Lot_Frontage)
+
+train$Lot_Area = winsorize(train$Lot_Area)
+Lot_Area_M = max(train$Lot_Area)
+
+train$Mas_Vnr_Area = winsorize(train$Mas_Vnr_Area)
+Mas_Vnr_Area_M = max(train$Mas_Vnr_Area)
+
+train$Bsmt_Unf_SF = winsorize(train$Bsmt_Unf_SF)
+Bsmt_Unf_SF_M = max(train$Bsmt_Unf_SF)
+
+train$Total_Bsmt_SF = winsorize(train$Total_Bsmt_SF)
+Total_Bsmt_SF_M = max(train$Total_Bsmt_SF)
+
+train$Second_Flr_SF = winsorize(train$Second_Flr_SF)
+Second_Flr_SF_M = max(train$Second_Flr_SF)
+
+train$First_Flr_SF = winsorize(train$First_Flr_SF)
+First_Flr_SF_M = max(train$First_Flr_SF)
+
+train$Gr_Liv_Area = winsorize(train$Gr_Liv_Area)
+Gr_Liv_Area_M = max(train$Gr_Liv_Area)
+
+train$Garage_Area = winsorize(train$Garage_Area)
+Garage_Area_M = max(train$Garage_Area)
+
+train$Wood_Deck_SF = winsorize(train$Wood_Deck_SF)
+Wood_Deck_SF_M = max(train$Wood_Deck_SF)
+
+train$Open_Porch_SF = winsorize(train$Open_Porch_SF)
+Open_Porch_SF_M = max(train$Open_Porch_SF)
+
+train$Enclosed_Porch = winsorize(train$Enclosed_Porch)
+Enclosed_Porch_M = max(train$Enclosed_Porch)
+
+train$Screen_Porch = winsorize(train$Screen_Porch)
+Screen_Porch_M = max(train$Screen_Porch)
+```
+
+### Winsorizing Test
+```{r}
+test$Lot_Frontage = winsorize(test$Lot_Frontage, M=Lot_Frontage_M)
+test$Lot_Area = winsorize(test$Lot_Area, M=Lot_Area_M)
+test$Mas_Vnr_Area = winsorize(test$Mas_Vnr_Area, M=Mas_Vnr_Area_M)
+test$Bsmt_Unf_SF = winsorize(test$Bsmt_Unf_SF, M=Bsmt_Unf_SF_M)
+test$Total_Bsmt_SF = winsorize(test$Total_Bsmt_SF, M=Total_Bsmt_SF_M)
+test$Second_Flr_SF = winsorize(test$Second_Flr_SF, M=Second_Flr_SF_M)
+test$First_Flr_SF = winsorize(test$First_Flr_SF, M=First_Flr_SF_M)
+test$Gr_Liv_Area = winsorize(test$Gr_Liv_Area, M=Gr_Liv_Area_M)
+test$Garage_Area = winsorize(test$Garage_Area, M=Garage_Area_M)
+test$Wood_Deck_SF = winsorize(test$Wood_Deck_SF, M=Wood_Deck_SF_M)
+test$Open_Porch_SF = winsorize(test$Open_Porch_SF, M=Open_Porch_SF_M)
+test$Enclosed_Porch = winsorize(test$Enclosed_Porch, M=Enclosed_Porch_M)
+test$Screen_Porch = winsorize(test$Screen_Porch, M=Screen_Porch_M)
+```
+
+
+### Dummy Vars Function
+```{r}
+dummy_vars = function(dataset)
+{
+  data.x = subset(dataset, select = -c(PID) ) # data without "PID" and "Sale_Price"
+  data.x = dataset
+  # replace missing by zero
+  # data.x$Garage_Yr_Blt[is.na(data.x$Garage_Yr_Blt)] = 0
+  
+  categorical.vars = colnames(data.x)[
+    which(sapply(data.x,
+                   function(x) mode(x)=="character"))]
+  
+  data.dummy.cols = dummy_cols(data.x, select_columns = categorical.vars, remove_selected_columns = TRUE)
+  
+  processed.matrix = data.dummy.cols[order(names(data.dummy.cols))]
+  processed.matrix
+}
+```
+
+### creating dummy vars
+```{r}
+set.seed(6779)
+
+# train.x
+train.x = dummy_vars(subset(train, select = -c(Sale_Price) ))
+train.x = train.x[order(names(train.x))]
+
+# test.x
+test.x = dummy_vars(test)
+
+testonly <- setdiff(names(test.x), names(train.x))
+trainonly <- setdiff(names(train.x), names(test.x))
+df = data.frame(matrix(0, nrow = dim(test.x)[1], ncol = length(trainonly)))
+colnames(df) = trainonly
+all_columns = cbind(test.x, df)
+test.x = all_columns[ , !(names(all_columns) %in% testonly)]
+
+test.x = test.x[order(names(test.x))]
+```
+
+```{r}
+cvfit = cv.glmnet(as.matrix(train.x), log(train$Sale_Price), alpha = 0)
+pred_y = as.vector(predict(cvfit, as.matrix(test.x))) # will be in log scale
+
+calc_RMSE(pred_y, log(test_y$Sale_Price))
+
+```
+
+```{r}
+```

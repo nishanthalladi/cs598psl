@@ -17,7 +17,7 @@ library(fastDummies)
 calc_RMSE = function(predictions, actuals)
 {
   n = length(actuals)
-  sqrt((1 / n) * sum((log(predictions) - log(actuals)) ^ 2))
+  sqrt((1 / n) * sum((predictions - actuals) ^ 2))
 }
 
 ```
@@ -40,7 +40,8 @@ train = train_f7 # TODO remove after testing
 
 ### Remove unwanted predictors from train
 ```{r}
-train = subset(train, select = -c(Street, Utilities, Condition_2, Roof_Matl, Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF, Pool_Area, Longitude, Latitude) )
+# train = subset(train, select = -c(Street, Utilities, Condition_2, Roof_Matl, Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF, Pool_Area, Longitude, Latitude) )
+train = subset(train, select = -c(Street, Utilities, Condition_2, Roof_Matl, Heating, Pool_QC, Misc_Feature, Longitude, Latitude) )
 ```
 
 ```{r}
@@ -66,25 +67,58 @@ removeable_names = colnames(cat_only[removeable_cols])
 train = train[,!(colnames(train)) %in% removeable_names]
 ```
 
+```{r}
+train$NeighRich[train$Neighborhood %in% c('Stone_Brook', 'Northridge_Heights', 'Northridge')] = 2
+train$NeighRich[!train$Neighborhood %in% c('Meadow_Village', 'Iowa_DOT_and_Rail_Road', 'Briardale', 'Stone_Brook', 'Northridge_Heights', 'Northridge')] = 1
+train$NeighRich[train$Neighborhood %in% c('Meadow_Village', 'Iowa_DOT_and_Rail_Road', 'Briardale')] = 0
+
+train$TotalBathrooms = train$Full_Bath + (train$Half_Bath*0.5) + train$Bsmt_Full_Bath + (train$Bsmt_Half_Bath*0.5)
+
+train$Age = as.numeric(train$Year_Sold) - train$Year_Remod_Add
+
+train$IsNew = ifelse(train$Year_Sold == train$Year_Built, 1, 0)
+
+train$TotalSqFeet <- train$Gr_Liv_Area + train$Total_Bsmt_SF
+```
+
+```{r}
+library(caret)
+
+numeric_var_names = c('Lot_Frontage', 'Lot_Area','Bsmt_FullBath','Bsmt_HalfBath','Bsmt_Fin_SF_2','Bsmt_Unf_SF','Mas_Vnr_Area','Year_Built','First_Flr_SF', 'Second_Flr_SF', 'Low_Qual_Fin_SF','Gr_Liv_Area', 'Full_Bath', 'Half_Bath', 'Wood_Deck_SF', 'Open_Porch_SF', 'Enclosed_Porch', 'Three_season_porch', 'Screen_Porch', 'Pool_Area', 'Misc_Val', 'TotalBathrooms', 'Age', 'TotalSqFeet', 'Total_Bsmt_SF', 'Garage_Area')
+
+numeric_vars = train[, names(train) %in% numeric_var_names]
+log_transformed_idxs = c()
+
+# for(i in 1:ncol(numeric_vars)){
+#   if (abs(Skew(numeric_vars[,i])) > 1){
+#     log_transformed_idxs = c(log_transformed_idxs, i)
+#     numeric_vars[,i] = log(numeric_vars[,i] +1)
+#   }
+# }
+# log_transformed_vars = numeric_var_names[log_transformed_idxs]
+pre_num = preProcess(numeric_vars, method = c("center", "scale"))
+
+normalized_numerics <- predict(pre_num, numeric_vars)
+```
 
 ### Winzorize train data
 ```{r}
-train$Lot_Frontage = Winsorize(train$Lot_Frontage, minval = 0)
-train$Lot_Area = Winsorize(train$Lot_Area, minval = 0)
-train$Mas_Vnr_Area = Winsorize(train$Mas_Vnr_Area, minval = 0)
-train$BsmtFin_SF_2 = Winsorize(train$BsmtFin_SF_2, minval = 0)
-train$Bsmt_Unf_SF = Winsorize(train$Bsmt_Unf_SF, minval = 0)
-train$Total_Bsmt_SF = Winsorize(train$Total_Bsmt_SF, minval = 0)
-train$Second_Flr_SF = Winsorize(train$Second_Flr_SF, minval = 0)
-train$First_Flr_SF = Winsorize(train$First_Flr_SF, minval = 0)
-train$Gr_Liv_Area = Winsorize(train$Gr_Liv_Area, minval = 0)
-train$Garage_Area = Winsorize(train$Garage_Area, minval = 0)
-train$Wood_Deck_SF = Winsorize(train$Wood_Deck_SF, minval = 0)
-train$Open_Porch_SF = Winsorize(train$Open_Porch_SF, minval = 0)
-train$Enclosed_Porch = Winsorize(train$Enclosed_Porch, minval = 0)
-train$Three_season_porch = Winsorize(train$Three_season_porch, minval = 0)
-train$Screen_Porch = Winsorize(train$Screen_Porch, minval = 0)
-train$Misc_Val = Winsorize(train$Misc_Val, minval = 0)
+train$Lot_Frontage = Winsorize(train$Lot_Frontage, probs = c(0.00, 0.95))
+train$Lot_Area = Winsorize(train$Lot_Area, probs = c(0.00, 0.95))
+train$Mas_Vnr_Area = Winsorize(train$Mas_Vnr_Area, probs = c(0.00, 0.95))
+train$BsmtFin_SF_2 = Winsorize(train$BsmtFin_SF_2, probs = c(0.00, 0.95))
+train$Bsmt_Unf_SF = Winsorize(train$Bsmt_Unf_SF, probs = c(0.00, 0.95))
+train$Total_Bsmt_SF = Winsorize(train$Total_Bsmt_SF, probs = c(0.00, 0.95))
+train$Second_Flr_SF = Winsorize(train$Second_Flr_SF, probs = c(0.00, 0.95))
+train$First_Flr_SF = Winsorize(train$First_Flr_SF, probs = c(0.00, 0.95))
+train$Gr_Liv_Area = Winsorize(train$Gr_Liv_Area, probs = c(0.00, 0.95))
+train$Garage_Area = Winsorize(train$Garage_Area, probs = c(0.00, 0.95))
+train$Wood_Deck_SF = Winsorize(train$Wood_Deck_SF, probs = c(0.00, 0.95))
+train$Open_Porch_SF = Winsorize(train$Open_Porch_SF, probs = c(0.00, 0.95))
+train$Enclosed_Porch = Winsorize(train$Enclosed_Porch, probs = c(0.00, 0.95))
+train$Three_season_porch = Winsorize(train$Three_season_porch, probs = c(0.00, 0.95))
+train$Screen_Porch = Winsorize(train$Screen_Porch, probs = c(0.00, 0.95))
+train$Misc_Val = Winsorize(train$Misc_Val, probs = c(0.00, 0.95))
 ```
 
 ```{r}
@@ -111,7 +145,14 @@ categoricalize = function(dataset)
 ```{r}
 train.y = log(train$Sale_Price) # log transformed "Sale_Price"
 train.x = categoricalize(subset(train, select = -c(Sale_Price) ))
+
+for (name in numeric_var_names){
+  train.x[name] = NULL
+}
+train.x = cbind(train.x, normalized_numerics)
 train.names = colnames(train.x)
+
+train.x = train.x[order(names(train.x))]
 ```
 
 
@@ -146,7 +187,28 @@ test_y = test_y_f7 # TODO remove after testing
 
 ### Process categorical test data
 ```{r}
+test$NeighRich[test$Neighborhood %in% c('Stone_Brook', 'Northridge_Heights', 'Northridge')] = 2
+test$NeighRich[!test$Neighborhood %in% c('Meadow_Village', 'Iowa_DOT_and_Rail_Road', 'Briardale', 'Stone_Brook', 'Northridge_Heights', 'Northridge')] = 1
+test$NeighRich[test$Neighborhood %in% c('Meadow_Village', 'Iowa_DOT_and_Rail_Road', 'Briardale')] = 0
+test$TotalBathrooms = test$Full_Bath + (test$Half_Bath*0.5) + test$Bsmt_Full_Bath + (test$Bsmt_Half_Bath*0.5)
+test$Age = as.numeric(test$Year_Sold) - test$Year_Remod_Add
+test$IsNew = ifelse(test$Year_Sold == test$Year_Built, 1, 0)
+test$TotalSqFeet <- test$Gr_Liv_Area + test$Total_Bsmt_SF
+
 test.x = categoricalize(test)
+
+numeric_vars_test = test.x[, names(test.x) %in% numeric_var_names]
+# for (var in log_transformed_vars) {
+#   numeric_vars_test[,i] = log(numeric_vars_test[,i] + 1)
+# }
+pre_num = preProcess(numeric_vars_test, method = c("center", "scale"))
+normalized_numerics <- predict(pre_num, numeric_vars_test)
+
+for (name in numeric_var_names){
+  test.x[name] = NULL
+}
+
+test.x = cbind(test.x, normalized_numerics)
 test.names = colnames(test.x)
 
 # train.names was saved during train data processing
@@ -160,25 +222,25 @@ all_columns = cbind(test.x, df)
 test.x = all_columns[ , !(names(all_columns) %in% testonly)]
 test.x = test.x[order(names(test.x))]
 
-set.seed(1776)
+set.seed(176544)
 ```
 
 # Linear Regression Model
 
 ```{r}
 library(glmnet)
-
+ls = 1:100 / 10000
 # Just elastic net
-cvfit = cv.glmnet(as.matrix(train.x), train.y, alpha = 0.5)
-pred_y = as.vector(exp(predict(cvfit, as.matrix(test.x))))
+cvfit = cv.glmnet(as.matrix(train.x), train.y, alpha = 0.2)
+pred_y = as.vector(predict(cvfit, as.matrix(test.x)))
 
-print(calc_RMSE(pred_y, test_y$Sale_Price))
+print(calc_RMSE(pred_y, log(test_y$Sale_Price)))
 ```
 
 ```{r}
 # Lasso variable selection
 cvfit = cv.glmnet(as.matrix(train.x), train.y, alpha = 1)
-
+coeffs = coef(cvfit)
 reduced_predictors = names(coef(cvfit)[rowSums(coeffs) != 0, ])
 reduced_predictors = reduced_predictors[-1]
 
@@ -187,9 +249,9 @@ print(calc_RMSE(pred_y, test_y$Sale_Price))
 
 # Ridge based off Lasso var selection
 cvfit = cv.glmnet(as.matrix(subset(train.x, select = c(reduced_predictors))), train.y, alpha = 0, family='gaussian')
-pred_y = as.vector(exp(predict(cvfit, as.matrix(subset(test.x, select = c(reduced_predictors))))))
+pred_y = as.vector((predict(cvfit, as.matrix(subset(test.x, select = c(reduced_predictors))))))
 
-print(calc_RMSE(pred_y, test_y$Sale_Price))
+print(calc_RMSE(pred_y, log(test_y$Sale_Price)))
 
 ```
 
@@ -197,7 +259,7 @@ print(calc_RMSE(pred_y, test_y$Sale_Price))
 ```{r}
 # Just Ridge
 cvfit = cv.glmnet(as.matrix(train.x), train.y, alpha = 0, family='gaussian')
-pred_y = as.vector(exp(predict(cvfit, as.matrix(test.x))))
+pred_y = as.vector((predict(cvfit, as.matrix(test.x))))
 
 print(calc_RMSE(pred_y, test_y$Sale_Price))
 
