@@ -33,7 +33,7 @@ library(lubridate)
 
 ## Evaluate the accuracy
 ```{r}
-myeval = function(){
+calculate_wae = function(){
   file_path = paste0('Proj2_Data/test_with_label.csv')
   test_with_label = read.csv(file_path)
   num_folds = 10
@@ -49,12 +49,18 @@ myeval = function(){
     file_path = paste0('Proj2_Data/fold_', i, '/mypred.csv')
     test_pred = read.csv(file_path)
     
+    print(head(test))
+    print(head(test_pred))
+    
     actuals_and_predictions <- test %>%
       left_join(test_pred, by = c('Date', 'Store', 'Dept'))
     
     actuals = actuals_and_predictions$Weekly_Sales
-    preds = actuals_and_predictions$Weekly_Pred
+    preds <<- actuals_and_predictions$Weekly_Pred
     weights = if_else(actuals_and_predictions$IsHoliday.x, 5, 1)
+    
+    print(preds[is.na(preds)])
+    
     wae[i] = sum(weights * abs(actuals - preds)) / sum(weights)
   }
   return(wae)
@@ -63,7 +69,7 @@ myeval = function(){
 
 ## Train data and generate predictions for test set
 ```{r}
-train_and_pred = function(train, test)
+train_and_pred_and_write = function(train, test, i)
 {
   # find the unique pairs of (Store, Dept) combo that appeared in both training and test sets
   train_pairs = train[, 1:2] %>% count(Store, Dept) %>% filter(n != 0)
@@ -82,28 +88,30 @@ train_and_pred = function(train, test)
     mutate(Yr = year(Date))
   
   # construct the design matrix only once
-  train_split = as_tibble(model.matrix(~ Weekly_Sales + Store + Dept + Yr + Wk, train_split)) %>%
+  train_tibbles = as_tibble(model.matrix(~ Weekly_Sales + Store + Dept + Yr + Wk, train_split)) %>%
     group_split(Store, Dept)
-  test_split = as_tibble(model.matrix(~ Store + Dept + Yr + Wk, test_split)) %>%
+  test_tibbles = as_tibble(model.matrix(~ Store + Dept + Yr + Wk, test_split)) %>%
     mutate(Date = test_split$Date) %>% 
     group_split(Store, Dept)
   
-  # pre-allocate a list to store the predictions
-    test_pred = vector(mode = "list", length = nrow(unique_pairs))
-  
   preds = c()
   # perform regression for each split, note we used lm.fit instead of lm
-  for (i in 1:nrow(unique_pairs)) 
+  for (j in 1:nrow(unique_pairs)) 
   {
-    tmp_train = train_split[[i]]
-    tmp_test = test_split[[i]]
-      
+    tmp_train = train_tibbles[[j]]
+    tmp_test = test_tibbles[[j]]
+
     mycoef = lm.fit(as.matrix(tmp_train[, -(2:4)]), tmp_train$Weekly_Sales)$coefficients
     mycoef[is.na(mycoef)] = 0
     tmp_pred = mycoef[1] + as.matrix(tmp_test[, 4:55]) %*% mycoef[-1]
     preds = c(preds, tmp_pred)
   }
-  as.data.frame(preds)
+
+  # test = cbind(test, Weekly_Pred = test_pred)
+  test_split$Weekly_Pred = preds
+  
+  file_path = paste0('Proj2_Data/fold_', i, '/mypred.csv')
+  readr::write_csv(test_split, file_path)
 }
 ```
 
@@ -118,20 +126,41 @@ for (i in 1:num_folds) {
   file_path = paste0('Proj2_Data/fold_', i, '/test.csv')
   test = read.csv(file_path)
   
-  start_last_year = as.Date(min(test$Date)) - 375
-  end_last_year = as.Date(max(test$Date)) - 350
+  # start_last_year = as.Date(min(test$Date)) - 375
+  # end_last_year = as.Date(max(test$Date)) - 350
   
-  test_pred = train_and_pred(train, test)
-  
-  # test = cbind(test, Weekly_Pred = test_pred)
-  test$Weekly_Pred = test_pred
-  
-  
-  file_path = paste0('Proj2_Data/fold_', i, '/mypred.csv')
-  readr::write_csv(test, file_path)
+  #test_pred = train_and_pred(train, test)
+  train_and_pred_and_write(train, test, i)
 }
-print(mean(myeval()))
+print(mean(calculate_wae()))
 ```
+
+```{r}
+file_path = paste0('Proj2_Data/fold_', i, '/test.csv')
+test = read.csv(file_path)
+# test =  test %>%
+#   select(-IsHoliday) %>%
+#   left_join(test_with_label, by = c('Date', 'Store', 'Dept'))
+
+file_path = paste0('Proj2_Data/fold_', i, '/mypred.csv')
+test_pred = read.csv(file_path)
+
+# print(head(test))
+# print(head(test_pred))
+
+actuals_and_predictions <- test %>%
+  left_join(test_pred, by = c('Date', 'Store', 'Dept'))
+
+
+```
+
+```{r}
+actuals_and_predictions[is.na(actuals_and_predictions$Weekly_Pred),]
+```
+
+
+```{r}
+print(calculate_wae())
 ```
 
 
