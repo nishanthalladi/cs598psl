@@ -14,24 +14,7 @@ library(tidyverse)
 library(lubridate)
 ```
 
-
-### Load train data
-```{r}
-# train_f1 = read.csv("Proj2_Data/fold_1/train.csv", stringsAsFactors = FALSE)
-# train_f2 = read.csv("Proj2_Data/fold_2/train.csv", stringsAsFactors = FALSE)
-# train_f3 = read.csv("Proj2_Data/fold_3/train.csv", stringsAsFactors = FALSE)
-# train_f4 = read.csv("Proj2_Data/fold_4/train.csv", stringsAsFactors = FALSE)
-# train_f5 = read.csv("Proj2_Data/fold_5/train.csv", stringsAsFactors = FALSE)
-# train_f6 = read.csv("Proj2_Data/fold_6/train.csv", stringsAsFactors = FALSE)
-# train_f7 = read.csv("Proj2_Data/fold_7/train.csv", stringsAsFactors = FALSE)
-# train_f8 = read.csv("Proj2_Data/fold_8/train.csv", stringsAsFactors = FALSE)
-# train_f9 = read.csv("Proj2_Data/fold_9/train.csv", stringsAsFactors = FALSE)
-# train_f10 = read.csv("Proj2_Data/fold_10/train.csv", stringsAsFactors = FALSE)
-# 
-# train = train_f7 # TODO remove after testing
-```
-
-## Evaluate the accuracy
+## Evaluate the Weighted Absolute Error (WAE)
 ```{r}
 calculate_wae = function(){
   file_path = paste0('Proj2_Data/test_with_label.csv')
@@ -49,18 +32,12 @@ calculate_wae = function(){
     file_path = paste0('Proj2_Data/fold_', i, '/mypred.csv')
     test_pred = read.csv(file_path)
     
-    print(head(test))
-    print(head(test_pred))
-    
-    actuals_and_predictions <- test %>%
+    new_test <- test %>%
       left_join(test_pred, by = c('Date', 'Store', 'Dept'))
     
-    actuals = actuals_and_predictions$Weekly_Sales
-    preds <<- actuals_and_predictions$Weekly_Pred
-    weights = if_else(actuals_and_predictions$IsHoliday.x, 5, 1)
-    
-    print(preds[is.na(preds)])
-    
+    actuals = new_test$Weekly_Sales
+    preds = new_test$Weekly_Pred
+    weights = if_else(new_test$IsHoliday.x, 5, 1)
     wae[i] = sum(weights * abs(actuals - preds)) / sum(weights)
   }
   return(wae)
@@ -86,7 +63,7 @@ train_and_pred_and_write = function(train, test, i)
     left_join(test, by = c('Store', 'Dept')) %>% 
     mutate(Wk = factor(ifelse(year(Date) == 2010, week(Date) - 1, week(Date)), levels = 1:52)) %>%
     mutate(Yr = year(Date))
-  
+
   # construct the design matrix only once
   train_tibbles = as_tibble(model.matrix(~ Weekly_Sales + Store + Dept + Yr + Wk, train_split)) %>%
     group_split(Store, Dept)
@@ -106,12 +83,19 @@ train_and_pred_and_write = function(train, test, i)
     tmp_pred = mycoef[1] + as.matrix(tmp_test[, 4:55]) %*% mycoef[-1]
     preds = c(preds, tmp_pred)
   }
-
-  # test = cbind(test, Weekly_Pred = test_pred)
   test_split$Weekly_Pred = preds
   
+  # join back test split to test and fill in NA's
+  mypred_df <<- test %>% 
+    left_join(test_split, by = c('Store', 'Dept', 'Date', 'IsHoliday'))
+  
+  mypred_df <<- mypred_df[,c('Store', 'Dept', 'Date', 'IsHoliday', 'Weekly_Pred')]
+  
+  idx_NA = is.na(mypred_df$Weekly_Pred)
+  mypred_df$Weekly_Pred[idx_NA] = 0
+  
   file_path = paste0('Proj2_Data/fold_', i, '/mypred.csv')
-  readr::write_csv(test_split, file_path)
+  readr::write_csv(mypred_df, file_path)
 }
 ```
 
@@ -126,42 +110,12 @@ for (i in 1:num_folds) {
   file_path = paste0('Proj2_Data/fold_', i, '/test.csv')
   test = read.csv(file_path)
   
-  # start_last_year = as.Date(min(test$Date)) - 375
-  # end_last_year = as.Date(max(test$Date)) - 350
-  
-  #test_pred = train_and_pred(train, test)
   train_and_pred_and_write(train, test, i)
 }
-print(mean(calculate_wae()))
+wae = calculate_wae()
+print(wae)
+print("Mean WAE:")
+print(mean(wae))
 ```
-
-```{r}
-file_path = paste0('Proj2_Data/fold_', i, '/test.csv')
-test = read.csv(file_path)
-# test =  test %>%
-#   select(-IsHoliday) %>%
-#   left_join(test_with_label, by = c('Date', 'Store', 'Dept'))
-
-file_path = paste0('Proj2_Data/fold_', i, '/mypred.csv')
-test_pred = read.csv(file_path)
-
-# print(head(test))
-# print(head(test_pred))
-
-actuals_and_predictions <- test %>%
-  left_join(test_pred, by = c('Date', 'Store', 'Dept'))
-
-
-```
-
-```{r}
-actuals_and_predictions[is.na(actuals_and_predictions$Weekly_Pred),]
-```
-
-
-```{r}
-print(calculate_wae())
-```
-
 
 
