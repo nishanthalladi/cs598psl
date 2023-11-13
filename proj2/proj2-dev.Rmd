@@ -48,6 +48,8 @@ calculate_wae = function(){
 ```{r}
 train_and_pred_and_write = function(train, test, i)
 {
+  # This is where we should call the SVD transformation function
+  
   # find the unique pairs of (Store, Dept) combo that appeared in both training and test sets
   train_pairs = train[, 1:2] %>% count(Store, Dept) %>% filter(n != 0)
   test_pairs = test[, 1:2] %>% count(Store, Dept) %>% filter(n != 0)
@@ -85,11 +87,11 @@ train_and_pred_and_write = function(train, test, i)
   }
   test_split$Weekly_Pred = preds
   
-  # join back test split to test and fill in NA's
-  mypred_df <<- test %>% 
+  # join back test split to test and fill in NA's, this produces the correct shape we need for WAE later
+  mypred_df = test %>% 
     left_join(test_split, by = c('Store', 'Dept', 'Date', 'IsHoliday'))
   
-  mypred_df <<- mypred_df[,c('Store', 'Dept', 'Date', 'IsHoliday', 'Weekly_Pred')]
+  mypred_df = mypred_df[,c('Store', 'Dept', 'Date', 'IsHoliday', 'Weekly_Pred')]
   
   idx_NA = is.na(mypred_df$Weekly_Pred)
   mypred_df$Weekly_Pred[idx_NA] = 0
@@ -99,9 +101,74 @@ train_and_pred_and_write = function(train, test, i)
 }
 ```
 
+### SVD Testing
+```{r}
+
+# The goal to take a sales matrix of n_stores x n_weeks for each department, run it through SVD, and get back a smoothed matrix that's also n_stores x n_weeks
+# Then, train a model to take store and week and treat the smoothed values as y_train
+
+# create X matrix (This is just for Dept 1)
+train_dept_ts = train %>%
+  filter(Dept == 1) %>%
+  select(Store, Date, Weekly_Sales) %>%
+  spread(Store, Weekly_Sales)
+
+# fill in zeroes if data doesn't exist
+train_dept_ts[is.na(train_dept_ts)] = 0
+print(dim(train_dept_ts))
+
+num_components_to_keep = 8
+train_spread = train_dept_ts
+
+z <- svd(train_spread[, 2:ncol(train_spread)], nu=num_components_to_keep, nv=num_components_to_keep)
+s <- diag(z$d[1:num_components_to_keep])
+train_spread[, 2:ncol(train_spread)] <- z$u %*% s %*% t(z$v)
+
+# Pseudocode for next steps
+#  loop through all departments j
+  # make the table based on store, week, sales
+  # svd to transform sales
+  # reverse table
+  # these are all for dept j
+  # train[store=store, dept=dept, date=date]$y = new_y
+
+# this might be an example of how we can get out transformed train_y back into train. This is from https://github.com/davidthaler/Walmart_competition_code/blob/master/grouped.forecast.R Line 64
+# result <- melt(train_spread)
+# pred.d.idx <- pred$Dept==d
+# #These are the Store-Date pairs in the submission for this dept
+# pred.d <- pred[pred.d.idx, c('Store', 'Date')]
+# pred.d <- join(pred.d, result)
+# pred$Weekly_Sales[pred.d.idx] <- pred.d$value
+
+```
+
+```{r}
+preprocess.svd <- function(train_spread, n.comp){
+  # Replaces the training data with a rank-reduced approximation of itself.
+  # This is for noise reduction. The intuition is that characteristics
+  # that are common across stores (within the same department) are probably
+  # signal, while those that are unique to one store may be noise.
+  #
+  # args:
+  # train - A matrix of Weekly_Sales values from the training set of dimension
+  #         (number of weeeks in training data) x (number of stores)
+  # n.comp - the number of components to keep in the singular value
+  #         decomposition
+  #
+  # returns:
+  #  the rank-reduced approximation of the training data
+  train_spread[is.na(train_spread)] <- 0
+  z <- svd(train_spread[, 2:ncol(train_spread)], nu=n.comp, nv=n.comp)
+  s <- diag(z$d[1:n.comp])
+  train_spread[, 2:ncol(train_spread)] <- z$u %*% s %*% t(z$v)
+  train_spread
+}
+```
+
+
 ## Loop through every fold to train model and predict test set
 ```{r}
-num_folds = 10
+num_folds = 1
 for (i in 1:num_folds) {
   print(paste0("Starting fold ", i))
   file_path = paste0('Proj2_Data/fold_', i, '/train.csv')
@@ -109,6 +176,9 @@ for (i in 1:num_folds) {
   
   file_path = paste0('Proj2_Data/fold_', i, '/test.csv')
   test = read.csv(file_path)
+  
+  # TODO replace train_y with smoothed values from svd
+  train_smoothed = 'todo'
   
   train_and_pred_and_write(train, test, i)
 }
