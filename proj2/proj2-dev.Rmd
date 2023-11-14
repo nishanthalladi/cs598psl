@@ -57,21 +57,25 @@ train_and_pred_and_write = function(train, test, i)
   train_split <<- unique_pairs %>% 
     left_join(train, by = c('Store', 'Dept')) %>% 
     mutate(Wk = factor(ifelse(year(Date) == 2010, week(Date) - 1, week(Date)), levels = 1:52)) %>%
-    mutate(Yr = year(Date))
+    mutate(Yr = year(Date)) %>%
+    mutate(Yr2 = year(Date) ^ 2)
+  
   
 # mutate(Yr = factor(year(Date)))
   
   test_split <<- unique_pairs %>% 
     left_join(test, by = c('Store', 'Dept')) %>% 
-    mutate(Wk = factor(ifelse(year(Date) == 2010, week(Date) - 1, week(Date)), levels = 1:52)) %>% mutate(Yr = year(Date))
+    mutate(Wk = factor(ifelse(year(Date) == 2010, week(Date) - 1, week(Date)), levels = 1:52)) %>% 
+    mutate(Yr = year(Date)) %>%
+    mutate(Yr2 = year(Date) ^ 2)
   # test_split[test_split$Yr == 2012,] = 2011
   # test_split = test_split %>% mutate(Yr = factor(year(Date)))
 
   # construct the design matrix only once
-  train_tibbles <<- as_tibble(model.matrix(~ Weekly_Sales + Store + Dept + Yr + Wk, train_split)) %>%
+  train_tibbles <<- as_tibble(model.matrix(~ Weekly_Sales + Store + Dept + Yr + Yr2+ Wk, train_split)) %>%
     group_split(Store, Dept)
   
-  test_tibbles <<- as_tibble(model.matrix(~ Store + Dept + Yr + Wk, test_split)) %>%
+  test_tibbles <<- as_tibble(model.matrix(~ Store + Dept + Yr + Yr2 + Wk, test_split)) %>%
     mutate(Date = test_split$Date) %>% 
     group_split(Store, Dept)
   
@@ -84,7 +88,7 @@ train_and_pred_and_write = function(train, test, i)
     
     mycoef = lm.fit(as.matrix(tmp_train[, -(2:4)]), tmp_train$Weekly_Sales)$coefficients
     mycoef[is.na(mycoef)] = 0
-    tmp_pred = mycoef[1] + as.matrix(tmp_test[, 4:55]) %*% mycoef[-1]
+    tmp_pred = mycoef[1] + as.matrix(tmp_test[, 4:56]) %*% mycoef[-1]
 
     preds = c(preds, tmp_pred)
   }
@@ -177,5 +181,4 @@ print(wae)
 print("Mean WAE:")
 print(mean(wae))
 ```
-
 
