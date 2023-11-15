@@ -54,7 +54,7 @@ train_and_pred_and_write = function(train, test, i)
   unique_pairs = intersect(train_pairs[, c("Store", "Dept")], test_pairs[, c("Store", "Dept")])
     
   # pick out the needed training samples, convert to dummy coding, then put them into a list
-  train_split <<- unique_pairs %>% 
+  train_split = unique_pairs %>% 
     left_join(train, by = c('Store', 'Dept')) %>% 
     mutate(Wk = factor(ifelse(year(Date) == 2010, week(Date) - 1, week(Date)), levels = 1:52)) %>%
     mutate(Yr = year(Date)) %>%
@@ -63,7 +63,7 @@ train_and_pred_and_write = function(train, test, i)
   
 # mutate(Yr = factor(year(Date)))
   
-  test_split <<- unique_pairs %>% 
+  test_split = unique_pairs %>% 
     left_join(test, by = c('Store', 'Dept')) %>% 
     mutate(Wk = factor(ifelse(year(Date) == 2010, week(Date) - 1, week(Date)), levels = 1:52)) %>% 
     mutate(Yr = year(Date)) %>%
@@ -72,10 +72,10 @@ train_and_pred_and_write = function(train, test, i)
   # test_split = test_split %>% mutate(Yr = factor(year(Date)))
 
   # construct the design matrix only once
-  train_tibbles <<- as_tibble(model.matrix(~ Weekly_Sales + Store + Dept + Yr + Yr2+ Wk, train_split)) %>%
+  train_tibbles = as_tibble(model.matrix(~ Weekly_Sales + Store + Dept + Yr + Yr2+ Wk, train_split)) %>%
     group_split(Store, Dept)
   
-  test_tibbles <<- as_tibble(model.matrix(~ Store + Dept + Yr + Yr2 + Wk, test_split)) %>%
+  test_tibbles = as_tibble(model.matrix(~ Store + Dept + Yr + Yr2 + Wk, test_split)) %>%
     mutate(Date = test_split$Date) %>% 
     group_split(Store, Dept)
   
@@ -92,7 +92,10 @@ train_and_pred_and_write = function(train, test, i)
 
     preds = c(preds, tmp_pred)
   }
+  
   test_split$Weekly_Pred = preds
+  idx_NA = is.na(test_split$Weekly_Pred)
+  test_split$Weekly_Pred[idx_NA] = 0
   
   # join back test split to test and fill in NA's, this produces the correct shape we need for WAE later
   mypred_df = test %>% 
@@ -102,6 +105,17 @@ train_and_pred_and_write = function(train, test, i)
   
   idx_NA = is.na(mypred_df$Weekly_Pred)
   mypred_df$Weekly_Pred[idx_NA] = 0
+  
+  for (k in 1:nrow(mypred_df)){
+    if(mypred_df$Date[k] == '2011-12-23'){
+      mypred_df$Weekly_Pred[ k ] = mypred_df$Weekly_Pred[ k]*6/7
+      dept = mypred_df[k,]$Dept
+      store = mypred_df[k,]$Store
+      date = '2011-12-30'
+      spec_pred = mypred_df[mypred_df$'Dept' == dept & mypred_df$'Store' == store & mypred_df$'Date' == date,]$Weekly_Pred 
+      mypred_df[mypred_df$'Dept' == dept & mypred_df$'Store' == store & mypred_df$'Date' == date,]$Weekly_Pred  = spec_pred +mypred_df$Weekly_Pred[ k ]*1/7
+    }
+  }
   file_path = paste0('Proj2_Data/fold_', i, '/mypred.csv')
   readr::write_csv(mypred_df, file_path)
 }
@@ -164,6 +178,7 @@ preprocess.svd <- function(train, n.comp){
 ```{r}
 num_folds = 10
 for (i in 1:num_folds) {
+  start.time=Sys.time()
   print(paste0("Starting fold ", i))
   file_path = paste0('Proj2_Data/fold_', i, '/train.csv')
   train = read.csv(file_path)
@@ -175,6 +190,9 @@ for (i in 1:num_folds) {
   train_smoothed = preprocess.svd(train, 8)
   
   train_and_pred_and_write(train_smoothed, test, i)
+  end.time= Sys.time()
+  time.taken <- round(end.time - start.time,2)
+  print(time.taken)
 }
 wae = calculate_wae()
 print(wae)
