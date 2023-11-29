@@ -1,0 +1,41 @@
+```{r}
+install.packages("stopwords")
+
+```
+
+```{r}
+train = read.table("train.tsv",
+                   stringsAsFactors = FALSE,
+                   header = TRUE)
+train$review = gsub('&lt;.*?&gt;', ' ', train$review)
+```
+
+
+```{r}
+stop_words = c("i", "me", "my", ...)
+it_train = itoken(train$review,
+                  preprocessor = tolower, 
+                  tokenizer = word_tokenizer)
+tmp.vocab = create_vocabulary(it_train, 
+                              stopwords = stop_words, 
+                              ngram = c(1L,4L))
+tmp.vocab = prune_vocabulary(tmp.vocab, term_count_min = 10,
+                             doc_proportion_max = 0.5,
+                             doc_proportion_min = 0.001)
+dtm_train  = create_dtm(it_train, vocab_vectorizer(tmp.vocab))
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
