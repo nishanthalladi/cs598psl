@@ -8,15 +8,15 @@ library(magrittr)
 ```
 
 ```{r}
-train = read.table("C:\\Users\\Kedde\\Desktop\\College\\Stat\\cs598psl\\proj3\\split_1\\train.tsv",
+train = read.table("split_1/train.tsv",
                    stringsAsFactors = FALSE,
                    header = TRUE)
-test = read.table("C:\\Users\\Kedde\\Desktop\\College\\Stat\\cs598psl\\proj3\\split_1\\test.tsv",
+test = read.table("split_1/test.tsv",
                    stringsAsFactors = FALSE,
                    header = TRUE)
 train$review = gsub('&lt;.*?&gt;', ' ', train$review)
 test$review = gsub('&lt;.*?&gt;', ' ', test$review)
-test_y  = read.table("C:\\Users\\Kedde\\Desktop\\College\\Stat\\cs598psl\\proj3\\split_1\\test_y.tsv",
+test_y  = read.table("split_1/test_y.tsv",
                    stringsAsFactors = FALSE,
                    header = TRUE)
 ```
@@ -51,7 +51,7 @@ dtm_train_new = create_dtm(it_train, vectorizer)
 
 ```{r}
 NFOLDS = 4
-glmnet_classifier = cv.glmnet(x = dtm_train, y = train[['sentiment']],
+glmnet_classifier = cv.glmnet(x = dtm_train_new, y = train[['sentiment']],
                               family = 'binomial',
                               # L1 penalty
                               alpha = 0,
@@ -76,4 +76,32 @@ dtm_test = create_dtm(it_test, vectorizer)
 
 preds = predict(glmnet_classifier, dtm_test, type = 'response')[,1]
 glmnet:::auc(test_y$sentiment, preds)
+```
+
+
+```{r}
+pos_dtm = dtm_train[train[['sentiment']] == 1,]
+neg_dtm = dtm_train[train[['sentiment']] == 0,]
+top_2k_t = c()
+top_2k_i = c()
+for (col in 1:ncol(dtm_train)) {
+  X = pos_dtm[,col]
+  Y = neg_dtm[,col]
+  t = t.test(X, Y)$statistic
+  if (length(top_2k_i) < 2000) {
+    top_2k_i = c(top_2k_i, col)
+    top_2k_t = c(top_2k_t, t)
+  } else {
+    t2k_min = min(unlist(top_2k_t))
+    if (abs(t) > t2k_min) {
+      idx = which.min(top_2k_t)
+      top_2k_i[idx] = col
+      top_2k_t[idx] = abs(t)
+    }
+  }
+}
+```
+
+```{r}
+vocab2k = colnames(dtm_train)[top_2k_i]
 ```
