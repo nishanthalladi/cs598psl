@@ -1,18 +1,29 @@
 ```{r}
-install.packages("stopwords")
-
+library("stopwords")
+library(text2vec)
+library("pROC")
+library(glmnet)
+library(data.table)
+library(magrittr)
 ```
 
 ```{r}
-train = read.table("train.tsv",
+train = read.table("C:\\Users\\Kedde\\Desktop\\College\\Stat\\cs598psl\\proj3\\split_1\\train.tsv",
+                   stringsAsFactors = FALSE,
+                   header = TRUE)
+test = read.table("C:\\Users\\Kedde\\Desktop\\College\\Stat\\cs598psl\\proj3\\split_1\\test.tsv",
                    stringsAsFactors = FALSE,
                    header = TRUE)
 train$review = gsub('&lt;.*?&gt;', ' ', train$review)
+test$review = gsub('&lt;.*?&gt;', ' ', test$review)
+test_y  = read.table("C:\\Users\\Kedde\\Desktop\\College\\Stat\\cs598psl\\proj3\\split_1\\test_y.tsv",
+                   stringsAsFactors = FALSE,
+                   header = TRUE)
 ```
 
 
 ```{r}
-stop_words = c("i", "me", "my", ...)
+stop_words = stopwords::stopwords("en", source = "nltk")
 it_train = itoken(train$review,
                   preprocessor = tolower, 
                   tokenizer = word_tokenizer)
@@ -25,17 +36,44 @@ tmp.vocab = prune_vocabulary(tmp.vocab, term_count_min = 10,
 dtm_train  = create_dtm(it_train, vocab_vectorizer(tmp.vocab))
 ```
 
+```{r}
+#Ridge to select vocab TBD:
+myvocab = tmp.vocab$term
+```
 
 ```{r}
-
+#"using this customized vocabulary, I proceeded with ridge regression on the five data splits. For each split, the initial part of my code resembled the following"
+vectorizer = vocab_vectorizer(create_vocabulary(myvocab, 
+                                                  ngram = c(1L, 2L)))
+dtm_train_new = create_dtm(it_train, vectorizer)
 ```
 
 
 ```{r}
-
+NFOLDS = 4
+glmnet_classifier = cv.glmnet(x = dtm_train, y = train[['sentiment']],
+                              family = 'binomial',
+                              # L1 penalty
+                              alpha = 0,
+                              # interested in the area under ROC curve
+                              type.measure = "auc",
+                              # 5-fold cross-validation
+                              nfolds = NFOLDS,
+                              # high value is less accurate, but has faster training
+                              thresh = 1e-3,
+                              # again lower number of iterations for faster training
+                              maxit = 1e3)
 ```
 
 
 ```{r}
+it_test = word_tokenizer(tolower(test$review))
+it_test = itoken(it_test, ids = test$id,
+                 # turn off progressbar because it won't look nice in rmd
+                 progressbar = FALSE)
 
+dtm_test = create_dtm(it_test, vectorizer)
+
+preds = predict(glmnet_classifier, dtm_test, type = 'response')[,1]
+glmnet:::auc(test_y$sentiment, preds)
 ```
