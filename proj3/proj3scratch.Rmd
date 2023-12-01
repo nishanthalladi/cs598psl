@@ -16,20 +16,23 @@ test = read.table("split_1/test.tsv",
                    header = TRUE)
 train$review = gsub('&lt;.*?&gt;', ' ', train$review)
 test$review = gsub('&lt;.*?&gt;', ' ', test$review)
+all_reviews = c(train$review, test$review)
+
 test_y  = read.table("split_1/test_y.tsv",
                    stringsAsFactors = FALSE,
                    header = TRUE)
+all_sentiments = c(train[['sentiment']], test_y$sentiment)
 ```
 
 
 ```{r}
 stop_words = stopwords::stopwords("en", source = "nltk")
-it_train = itoken(train$review,
+it_train = itoken(all_reviews,
                   preprocessor = tolower, 
                   tokenizer = word_tokenizer)
 tmp.vocab = create_vocabulary(it_train, 
                               stopwords = stop_words, 
-                              ngram = c(1L,4L))
+                              ngram = c(1L,2L))
 tmp.vocab = prune_vocabulary(tmp.vocab, term_count_min = 10,
                              doc_proportion_max = 0.5,
                              doc_proportion_min = 0.001)
@@ -37,13 +40,8 @@ dtm_train  = create_dtm(it_train, vocab_vectorizer(tmp.vocab))
 ```
 
 ```{r}
-#Ridge to select vocab TBD:
-# myvocab = tmp.vocab$term
-```
-
-```{r}
-pos_dtm = dtm_train[train[['sentiment']] == 1,]
-neg_dtm = dtm_train[train[['sentiment']] == 0,]
+pos_dtm = dtm_train[all_sentiments == 1,]
+neg_dtm = dtm_train[all_sentiments == 0,]
 top_2k_t = c()
 top_2k_i = c()
 for (col in 1:ncol(dtm_train)) {
@@ -76,36 +74,11 @@ dtm_train_new = create_dtm(it_train, vectorizer)
 ```
 
 ```{r}
-# do the iterative lasso 
-# for (i in 1:50) {
-#   n = nrow(dtm_train_new)
-#   subsetidxs = sample(1:n, .6*n)
-#   subset_glm = cv.glmnet(x = dtm_train_new[subsetidxs,], 
-#                          y = train[['sentiment']][subsetidxs],
-#                          family = "binomial")
-#   
-# }
-
-# glm = cv.glmnet(x = dtm_train_new, 
-#                        y = train[['sentiment']],
-#                        family = "binomial")
-# betacols = colnames(glm$glmnet.fit$beta)
-# betas = sort(abs(glm$glmnet.fit$beta[,betacols[length(betacols)]]), decreasing=TRUE)
-# myvocab = names(betas[1:999])
-```
-
-```{r}
-# vectorizer = vocab_vectorizer(create_vocabulary(myvocab, 
-#                                                   ngram = c(1L, 2L)))
-# dtm_train_new = create_dtm(it_train, vectorizer)
-```
-
-```{r}
 NFOLDS = 4
-glmnet_classifier = cv.glmnet(x = dtm_train_new, y = train[['sentiment']],
+glmnet_classifier = cv.glmnet(x = dtm_train_new, y = all_sentiments,
                               family = 'binomial',
                               # L1 penalty
-                              alpha = 0,
+                              alpha = 1,
                               # interested in the area under ROC curve
                               type.measure = "auc",
                               # 5-fold cross-validation
