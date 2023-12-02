@@ -84,6 +84,12 @@ train_and_pred_and_write = function(train, test)
       mypred_df[mypred_df$'Dept' == dept & mypred_df$'Store' == store & mypred_df$'Date' == date,]$Weekly_Pred  = spec_pred +mypred_df$Weekly_Pred[ k ]*1/7
     }
   }
+  for (l in 1:nrow(test)) {
+    if (!(mypred_df[l,]$Store == test[l,]$Store & mypred_df[l,]$Dept == test[l,]$Dept)) {
+      mypred_df[l,] = test[l,]
+      mypred_df[l,]$Weekly_Pred = 0
+    }
+  }
   file_path = paste0('mypred.csv')
   readr::write_csv(mypred_df, file_path)
 }
