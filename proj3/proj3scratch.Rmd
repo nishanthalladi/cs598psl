@@ -28,8 +28,12 @@ all_sentiments = c(train[['sentiment']], test_y$sentiment)
 ```{r}
 stop_words = stopwords::stopwords("en", source = "nltk")
 it_train = itoken(all_reviews,
-                  preprocessor = tolower, 
+                  preprocessor = tolower,
                   tokenizer = word_tokenizer)
+it_train2 = itoken(train$review,
+                  preprocessor = tolower,
+                  tokenizer = word_tokenizer)
+
 tmp.vocab = create_vocabulary(it_train, 
                               stopwords = stop_words, 
                               ngram = c(1L,2L))
@@ -70,31 +74,24 @@ myvocab = colnames(dtm_train)[top_2k_i]
 #"using this customized vocabulary, I proceeded with ridge regression on the five data splits. For each split, the initial part of my code resembled the following"
 vectorizer = vocab_vectorizer(create_vocabulary(myvocab, 
                                                   ngram = c(1L, 2L)))
-dtm_train_new = create_dtm(it_train, vectorizer)
+dtm_train_new = create_dtm(it_train2, vectorizer)
 ```
 
 ```{r}
-NFOLDS = 4
-glmnet_classifier = cv.glmnet(x = dtm_train_new, y = all_sentiments,
+set.seed(1)
+glmnet_classifier = cv.glmnet(x = dtm_train_new, y = train$sentiment,
                               family = 'binomial',
-                              # L1 penalty
                               alpha = 1,
-                              # interested in the area under ROC curve
                               type.measure = "auc",
-                              # 5-fold cross-validation
-                              nfolds = NFOLDS,
-                              # high value is less accurate, but has faster training
+                              nfolds = 4,
                               thresh = 1e-3,
-                              # again lower number of iterations for faster training
                               maxit = 1e3)
 ```
 
 
 ```{r}
 it_test = word_tokenizer(tolower(test$review))
-it_test = itoken(it_test, ids = test$id,
-                 # turn off progressbar because it won't look nice in rmd
-                 progressbar = FALSE)
+it_test = itoken(it_test, ids = test$id)
 
 dtm_test = create_dtm(it_test, vectorizer)
 
