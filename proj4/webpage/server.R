@@ -11,6 +11,19 @@ get_user_ratings = function(value_list) {
   dat = dat[Rating > 0]
 }
 
+system_2_solver = function(user_ratings)
+{
+  # create df for top 10 recommendation id's and calculated scores
+  predictions = data.frame(ids = rep(0, 10), scores = rep(0, 10))
+  
+  #-#-# dummy code, always returns first 10 movies
+  predictions$ids = 1:10
+  predictions$scores = (1:10)/10
+  #-#-#
+  
+  predictions
+}
+
 # read in data
 myurl = "https://liangfgithub.github.io/MovieData/"
 movies = readLines(paste0(myurl, 'movies.dat?raw=true'))
@@ -55,15 +68,15 @@ shinyServer(function(input, output, session) {
       value_list = reactiveValuesToList(input)
       user_ratings = get_user_ratings(value_list)
       
-      user_results = (1:10)/10
-      user_predicted_ids = 1:10
+      predictions = system_2_solver(user_ratings)
+      user_results = predictions$scores
+      user_predicted_ids = predictions$ids
       recom_results = data.table(Rank = 1:10, 
                                      MovieID = movies$MovieID[user_predicted_ids], 
                                      Title = movies$Title[user_predicted_ids], 
                                      Predicted_rating =  user_results)
       
     }) # still busy
-    
   }) # clicked on button
   
   
@@ -87,7 +100,6 @@ shinyServer(function(input, output, session) {
         )        
       }))) # columns
     }) # rows
-    
   }) # renderUI function
   
 }) # server function
