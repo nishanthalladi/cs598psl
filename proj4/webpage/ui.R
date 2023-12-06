@@ -15,14 +15,26 @@ shinyUI(
                             skin = "blue",
                             dashboardHeader(title = "Movie Recommender"),
                             dashboardSidebar(disable = TRUE),
-                            
-                            dashboardBody(
-                              includeCSS("movie.css"),
-                              selectInput("genre", "Choose a genre:", choices=genres),
-                              actionButton("genre_submit", "Get Recommendations")
+                            dashboardBody(includeCSS("movie.css"),
+                                          fluidRow(
+                                            box(width = 12, title = "Step 1: Select genre to search from", status = "info", solidHeader = TRUE, collapsible = TRUE,
+                                                selectInput("genre", "Genre:", choices=genres),
+                                                withBusyIndicatorUI(actionButton("genre_submit_button", "Get Recommendations"))
+                                            )
+                                          ),
+                                          fluidRow(
+                                            useShinyjs(),
+                                            box(
+                                              width = 12, status = "info", solidHeader = TRUE,
+                                              title = "Step 2: Discover movies you might like",
+                                              br(),
+                                              tableOutput("genre_results")
+                                            )
+                                          )
                             )
                       )
               ),
+             
              tabPanel("By Rating",
                       dashboardPage(
                             skin = "blue",
@@ -48,7 +60,7 @@ shinyUI(
                                                 actionButton("btn", "Click here to get your recommendations", class = "btn-warning")
                                               ),
                                               br(),
-                                              tableOutput("results")
+                                              tableOutput("ratings_results")
                                             )
                                           )
                             )
@@ -57,35 +69,3 @@ shinyUI(
   
   )
 )
-
-# shinyUI(
-#     dashboardPage(
-#           skin = "blue",
-#           dashboardHeader(title = "movie Recommender"),
-#           
-#           dashboardSidebar(disable = TRUE),
-# 
-#           dashboardBody(includeCSS("movie.css"),
-#               fluidRow(
-#                   box(width = 12, title = "Step 1: Rate as many movies as possible", status = "info", solidHeader = TRUE, collapsible = TRUE,
-#                       div(class = "rateitems",
-#                           uiOutput('ratings')
-#                       )
-#                   )
-#                 ),
-#               fluidRow(
-#                   useShinyjs(),
-#                   box(
-#                     width = 12, status = "info", solidHeader = TRUE,
-#                     title = "Step 2: Discover movies you might like",
-#                     br(),
-#                     withBusyIndicatorUI(
-#                       actionButton("btn", "Click here to get your recommendations", class = "btn-warning")
-#                     ),
-#                     br(),
-#                     tableOutput("results")
-#                   )
-#                )
-#           )
-#     )
-# ) 

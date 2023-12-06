@@ -11,6 +11,21 @@ get_user_ratings = function(value_list) {
   dat = dat[Rating > 0]
 }
 
+# TODO implement
+system_1_solver = function(genre)
+{
+  print(genre)
+  # create df for top 10 recommendation id's and calculated scores
+  predictions = data.frame(ids = rep(0, 10), scores = rep(0, 10))
+  
+  #-#-# dummy code, always returns first 10 movies
+  predictions$ids = 1:10 + 1
+  #-#-#
+  
+  predictions
+}
+
+# TODO implement
 system_2_solver = function(user_ratings)
 {
   # create df for top 10 recommendation id's and calculated scores
@@ -56,16 +71,29 @@ shinyServer(function(input, output, session) {
     })
   })
   
+  genre_recom_df = eventReactive(input$genre_submit_button, {
+    withBusyIndicatorServer("genre_submit", { # showing the busy indicator
+      
+      predictions = system_1_solver(input$genre)
+      user_predicted_ids = predictions$ids
+      recom_results = data.table(Rank = 1:10, 
+                                 MovieID = movies$MovieID[user_predicted_ids], 
+                                 Title = movies$Title[user_predicted_ids])
+      recom_results
+    })
+  })
+  
   # Calculate recommendations when the sbumbutton is clicked
-  df = eventReactive(input$btn, {
+  rating_recom_df = eventReactive(input$btn, {
     withBusyIndicatorServer("btn", { # showing the busy indicator
       # hide the rating container
       useShinyjs()
       jsCode = "document.querySelector('[data-widget=collapse]').click();"
       runjs(jsCode)
       
-      # get the user's rating data
+      # MovieID's of only movies that the user rated
       value_list = reactiveValuesToList(input)
+      # ratings of only the movies that the user rated
       user_ratings = get_user_ratings(value_list)
       
       predictions = system_2_solver(user_ratings)
@@ -75,16 +103,37 @@ shinyServer(function(input, output, session) {
                                      MovieID = movies$MovieID[user_predicted_ids], 
                                      Title = movies$Title[user_predicted_ids], 
                                      Predicted_rating =  user_results)
-      
+      recom_results
     }) # still busy
   }) # clicked on button
   
-  
-  # display the recommendations
-  output$results = renderUI({
+  # display the genre recommendations
+  output$genre_results = renderUI({
     num_rows = 2
     num_movies = 5
-    recom_result = df()
+    recom_result = genre_recom_df()
+    
+    lapply(1:num_rows, function(i) {
+      list(fluidRow(lapply(1:num_movies, function(j) {
+        box(width = 2, status = "success", solidHeader = TRUE, title = paste0("Rank ", (i - 1) * num_movies + j),
+            
+            div(style = "text-align:center", 
+                a(img(src = movies$image_url[recom_result$MovieID[(i - 1) * num_movies + j]], height = 150))
+            ),
+            div(style="text-align:center; font-size: 100%", 
+                strong(movies$Title[recom_result$MovieID[(i - 1) * num_movies + j]])
+            )
+            
+        )        
+      }))) # columns
+    }) # rows
+  }) # renderUI function
+   
+  # display the ratings recommendations
+  output$ratings_results = renderUI({
+    num_rows = 2
+    num_movies = 5
+    recom_result = rating_recom_df()
     
     lapply(1:num_rows, function(i) {
       list(fluidRow(lapply(1:num_movies, function(j) {
