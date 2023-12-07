@@ -18,7 +18,7 @@ shinyUI(
                             dashboardBody(includeCSS("movie.css"),
                                           fluidRow(
                                             box(width = 12, title = "Step 1: Select genre to search from", status = "info", solidHeader = TRUE, collapsible = TRUE,
-                                                selectInput("genre", "Genre:", choices=genres),
+                                                selectInput("genre_selection", "Genre:", choices=genres, multiple = FALSE),
                                                 withBusyIndicatorUI(actionButton("genre_submit_button", "Get Recommendations"))
                                             )
                                           ),
@@ -57,7 +57,7 @@ shinyUI(
                                               title = "Step 2: Discover movies you might like",
                                               br(),
                                               withBusyIndicatorUI(
-                                                actionButton("btn", "Click here to get your recommendations", class = "btn-warning")
+                                                actionButton("ratings_submit_button", "Click here to get your recommendations", class = "btn-warning")
                                               ),
                                               br(),
                                               tableOutput("ratings_results")

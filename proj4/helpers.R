@@ -11,6 +11,8 @@ genres <<- c("Action", "Adventure", "Animation",
              "Mystery", "Romance", "Sci-Fi", 
              "Thriller", "War", "Western")
 
+
+
 # Set up a button to have an animated loading indicator and a checkmark
 # for better user experience
 # Need to use with the corresponding `withBusyIndicator` server function
