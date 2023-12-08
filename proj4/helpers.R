@@ -11,7 +11,17 @@ genres <<- c("Action", "Adventure", "Animation",
              "Mystery", "Romance", "Sci-Fi", 
              "Thriller", "War", "Western")
 
+# This initializes a list of movieID's as top recommendations for each genre
+saved_genre_recoms <<- list()
+for (genre in genres)
+{
+  saved_genre_recoms[[genre]] = data.frame(ave_ratings=rep(0, 10), MovieID=rep(0, 10))
+}
 
+getGenreRecoms = function()
+{
+  saved_genre_recoms
+}
 
 # Set up a button to have an animated loading indicator and a checkmark
 # for better user experience

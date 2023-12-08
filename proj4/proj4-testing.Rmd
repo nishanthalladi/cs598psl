@@ -60,15 +60,32 @@ users = users[, -c(2,4,6,8)] # skip columns
 colnames(users) = c('UserID', 'Gender', 'Age', 'Occupation', 'Zip-code')
 ```
 
-
+## Ratings Matrix
 ```{r}
-preds = data.frame(MovieID = c(3, 4, 5))
-acts = data.frame(MovieID = c(1, 2, 3, 4, 5), Titles = c("ya1", "ya2", "ya3", "ya4", "ya5"))
-
-acts$Titles[acts$MovieID == preds$MovieID]
+ratings_mat = read.csv("ratings_matrix.csv")
 ```
 
+## normalize ratings matrix rows
+```{r}
+# print before
+print(mean(ratings_mat[1,], na.rm=TRUE))
+print(mean(ratings_mat[2,], na.rm=TRUE))
+print(mean(ratings_mat[3,], na.rm=TRUE))
 
+for(row in nrow(ratings_mat))
+{
+  ratings_mat[row,] = ratings_mat[row,] - mean(ratings_mat[row], na.rm=TRUE)
+}
+
+# print after (to see if the centering worked)
+print(mean(ratings_mat[1,], na.rm=TRUE))
+print(mean(ratings_mat[2,], na.rm=TRUE))
+print(mean(ratings_mat[3,], na.rm=TRUE))
+```
+
+```{r}
+# TODO test above block, then continue implementing System 2 here
+```
 
 
 

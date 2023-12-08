@@ -33,8 +33,8 @@ ratings_df = read.csv(paste0(myurl, 'ratings.dat?raw=true'),
                       header = FALSE)
 colnames(ratings_df) = c('UserID', 'MovieID', 'Rating', 'Timestamp')
 
-# create ratings matrix (movies x users)
-# TODO ELC
+# read in ratings matrix
+
 
 get_user_ratings = function(value_list) {
   dat = data.table(MovieID = sapply(strsplit(names(value_list), "_"), 
@@ -54,18 +54,27 @@ system_1_solver = function(genre)
   # get movieID's of movies in that genre
   ids_in_genre = movies_df[grepl(genre, movies_df$Genres), "MovieID"]
   
-  # TODO handle genres with few ratings (Documentary is ERRORING out)
-  # TODO fix movies appearing multiple times in suggestions (try film-noir)
-  ratings_df %>% 
-    group_by(MovieID) %>% 
-    summarize(ratings_per_movie = n(), 
-              ave_ratings = round(mean(Rating), dig=3)) %>%
-    inner_join(movies_df, by = 'MovieID') %>%
-    filter(ratings_per_movie > 1000) %>%
-    filter(MovieID %in% ids_in_genre) %>%
-    top_n(10, ave_ratings) %>%
-    select('ave_ratings', 'MovieID') %>%
-    arrange(desc(-ave_ratings))
+  # If we have recommended for this genre already, load that saved data
+  # instead of re-computing
+  if (sum(saved_genre_recoms[[genre]]$MovieID) > 0)
+  {
+    ret = saved_genre_recoms[[genre]]
+    print("reusing system1 genre recoms!")
+  }
+  else
+  {
+    ret = group_by(ratings_df, MovieID)
+    ret = summarize(ret, ratings_per_movie = n(), ave_ratings = round(mean(Rating), dig=3))
+    ret = inner_join(ret, movies_df, by = 'MovieID')
+    ret = filter(ret, ratings_per_movie > 100)
+    ret = filter(ret, MovieID %in% ids_in_genre)
+    ret = top_n(ret, 10, ave_ratings)
+    ret = select(ret, 'ave_ratings', 'MovieID')
+    ret = arrange(ret, desc(-ave_ratings))  
+    
+    saved_genre_recoms[[genre]] <<- ret
+  }
+  ret
 }
 
 # TODO implement
@@ -74,10 +83,10 @@ system_2_solver = function(user_ratings)
   # create df for top 10 recommendation id's and calculated scores
   predictions = data.frame(ids = rep(0, 10), scores = rep(0, 10))
   
-  #-#-# dummy code, always returns first 10 movies
+  # #-#-# dummy code, always returns first 10 movies
   predictions$ids = 1:10
   predictions$scores = (1:10)/10
-  #-#-#
+  # #-#-#
   
   predictions
 }
