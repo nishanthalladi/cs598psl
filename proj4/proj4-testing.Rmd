@@ -113,12 +113,60 @@ myIBCF = function(w) {
   S_post_step3_ = read.csv("S_post_step3.csv")
   S = S_post_step3_[,-1]
   rownames(S) <- S_post_step3_[,1]
-  
-  # do the thing
+  recom_rankings = list()
+  for (col in colnames(S))
+  {
+    recom_rankings[[col]] = (sum(S[[col]] * w, na.rm=TRUE)) / sum(S[[col]] * !is.na(w), na.rm=TRUE)
+  }
+  recom_rankings
 }
+
+# Create test user who perfers animated movies
+w_animated = rep(NA, 3706)
+w_animated[1] = 5
+w_animated[13] = 4
+w_animated[48] = 5
+w_animated[239] = 4
+w_animated[244] = 4
+w_animated[313] = 5
+w_animated[558] = 4
+w_animated[17] = 5
+w_animated[89] = 4
+w_animated[99] = 3
+w_animated[230] = 4
+w_animated[247] = 4
+w_animated[311] = 5
+w_animated[2303] = 4
+w_animated[2] = 1
+w_animated[3] = 2
+w_animated[4] = 1
+w_animated[5] = 2
+w_animated[6] = 3
+```
+
+```{r}
+#returned_rankings = myIBCF(w_animated) # run this for a much shorter computation time
+returned_rankings = myIBCF(ratings_mat[1181,]) # Why does this take forever..? Is this definitely user 1181..?
+non_na_ranks = returned_rankings[!is.na(returned_rankings)]
+head(non_na_ranks[order(-unlist(non_na_ranks))], n=100)
 
 ```
 
+```{r}
+S_post_step3_ = read.csv("S_post_step3.csv")
+S = S_post_step3_[,-1]
+rownames(S) <- S_post_step3_[,1]
+var = data.frame(row.names = rownames(S))
+
+for (col in colnames(S))
+{
+  var[[col]] = sum(S[[col]] * w_animated, na.rm=TRUE)
+  if (sum(var[[col]]) != 0)
+  {
+    print(sum(var[[col]]))
+  }
+}
+```
 
 
 
