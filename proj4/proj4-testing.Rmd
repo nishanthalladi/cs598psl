@@ -17,6 +17,7 @@ library(ggplot2)
 #library(DT)
 library(data.table)
 library(reshape2)
+library(coop)
 ```
 
 
@@ -65,28 +66,58 @@ colnames(users) = c('UserID', 'Gender', 'Age', 'Occupation', 'Zip-code')
 ratings_mat = read.csv("ratings_matrix.csv")
 ```
 
-## normalize ratings matrix rows
+## STEP 1: Center Ratings Matrix 
 ```{r}
-# print before
-print(mean(ratings_mat[1,], na.rm=TRUE))
-print(mean(ratings_mat[2,], na.rm=TRUE))
-print(mean(ratings_mat[3,], na.rm=TRUE))
+row_means = rowMeans(ratings_mat, na.rm=TRUE)
+ratings_mat_centered = ratings_mat - row_means
+```
+## STEP 2: Cosine Similarity
+```{r}
+S = coop::cosine(as.matrix(ratings_mat_centered), use = "pairwise.complete.obs")
+S = 0.5 + S/2
+for (i in 1:nrow(S)) {
+  S[i, i] = NA
+  for (j in i:nrow(S)) {
+    if ( length(intersect(which(!is.na(ratings_mat[,i])), which(!is.na(ratings_mat[,j])))) <= 2) {
+      S[i, j] = NA
+      S[j, i] = NA
+    }
+  }
+}
+write.csv(S, file="S_post_step2.csv")
+```
 
-for(row in nrow(ratings_mat))
-{
-  ratings_mat[row,] = ratings_mat[row,] - mean(ratings_mat[row], na.rm=TRUE)
+## STEP 3: Top 30 only
+```{r}
+S_post_step2_ = read.csv("S_post_step2.csv")
+S = S_post_step2_[,-1]
+rownames(S) <- S_post_step2_[,1]
+
+S[c("m1", "m10", "m100", "m1510", "m260", "m3212"), c("m1", "m10", "m100", "m1510", "m260", "m3212")]
+
+for (r in 1:nrow(S)) {
+  keep_idxs = order(as.matrix(S[r,]), decreasing=TRUE)[1:30]
+  S[r,][-keep_idxs] = NA
+}
+write.csv(S, file="S_post_step3.csv")
+```
+
+!!!!
+RUN CODE FROM HERE
+!!!!
+
+## STEP 4: myIBCF
+
+```{r}
+myIBCF = function(w) {
+  S_post_step3_ = read.csv("S_post_step3.csv")
+  S = S_post_step3_[,-1]
+  rownames(S) <- S_post_step3_[,1]
+  
+  # do the thing
 }
 
-# print after (to see if the centering worked)
-print(mean(ratings_mat[1,], na.rm=TRUE))
-print(mean(ratings_mat[2,], na.rm=TRUE))
-print(mean(ratings_mat[3,], na.rm=TRUE))
 ```
-
-```{r}
-# TODO test above block, then continue implementing System 2 here
-```
-
 
 
 

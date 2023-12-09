@@ -7,6 +7,10 @@ library(data.table)
 library(magrittr)
 ```
 
+## How we constructed our vocabulary to be 1000 words
+
+First we read in train and test data, and then combine them to be one dataset, as permitted in Campuswire post #626. 
+
 ```{r}
 train = read.table("split_1/train.tsv",
                    stringsAsFactors = FALSE,
@@ -24,6 +28,7 @@ test_y  = read.table("split_1/test_y.tsv",
 all_sentiments = c(train[['sentiment']], test_y$sentiment)
 ```
 
+After this, we build a document term matrix of all the n_grams of size 1 and 2 from the train and test data, with stopwords from the stopwords R package. 
 
 ```{r}
 stop_words = stopwords::stopwords("en", source = "nltk")
@@ -43,6 +48,8 @@ tmp.vocab = prune_vocabulary(tmp.vocab, term_count_min = 10,
 dtm_train  = create_dtm(it_train, vocab_vectorizer(tmp.vocab))
 ```
 
+Next, we carry out two sample t-tests for every "word" in our document term matrix, by comparing the number of times word appeared in positive reviews and in negative reviews. We record the 1000 "words" with the highest absolute t statistics (which indicates that a difference in means is more likely) and have that as our vocab.
+
 ```{r}
 pos_dtm = dtm_train[all_sentiments == 1,]
 neg_dtm = dtm_train[all_sentiments == 0,]
@@ -52,7 +59,7 @@ for (col in 1:ncol(dtm_train)) {
   X = pos_dtm[,col]
   Y = neg_dtm[,col]
   t = t.test(X, Y)$statistic
-  if (length(top_2k_i) < 1000) {
+  if (length(top_2k_i) < 999) {
     top_2k_i = c(top_2k_i, col)
     top_2k_t = c(top_2k_t, t)
   } else {
@@ -66,35 +73,12 @@ for (col in 1:ncol(dtm_train)) {
 }
 ```
 
+Next we write to a file
+
 ```{r}
 myvocab = colnames(dtm_train)[top_2k_i]
-```
-
-```{r}
-#"using this customized vocabulary, I proceeded with ridge regression on the five data splits. For each split, the initial part of my code resembled the following"
-vectorizer = vocab_vectorizer(create_vocabulary(myvocab, 
-                                                  ngram = c(1L, 2L)))
-dtm_train_new = create_dtm(it_train2, vectorizer)
-```
-
-```{r}
-set.seed(1)
-glmnet_classifier = cv.glmnet(x = dtm_train_new, y = train$sentiment,
-                              family = 'binomial',
-                              alpha = 1,
-                              type.measure = "auc",
-                              nfolds = 4,
-                              thresh = 1e-3,
-                              maxit = 1e3)
+write(myvocab, "myvocab.txt")
 ```
 
 
-```{r}
-it_test = word_tokenizer(tolower(test$review))
-it_test = itoken(it_test, ids = test$id)
 
-dtm_test = create_dtm(it_test, vectorizer)
-
-preds = predict(glmnet_classifier, dtm_test, type = 'response')[,1]
-glmnet:::auc(test_y$sentiment, preds)
-```
