@@ -20,7 +20,6 @@ library(reshape2)
 library(coop)
 ```
 
-
 # Load Data
 ## Ratings Data (ratings)
 ```{r}
@@ -64,6 +63,50 @@ colnames(users) = c('UserID', 'Gender', 'Age', 'Occupation', 'Zip-code')
 ## Ratings Matrix
 ```{r}
 ratings_mat = read.csv("ratings_matrix.csv")
+```
+
+# System I: 
+
+We propose a recommendation system that, given a genre, returns the the top ten highly-rated movies in that genre, given that there are more than 100 ratings for each movie that we are recommending. If there are less than 10 movies in that genre with more than 100 ratings, we append to that list with the top rated movies in general with no ratings minimum until the list is size 10.
+
+```{r}
+# Based on selected genre, chooses 10 popular recommendations
+system_1_solver = function(genre)
+{
+  print(genre)
+  
+  ratings_df = ratings
+  movies_df = movies
+  
+  # get movieID's of movies in that genre
+  ids_in_genre = movies_df[grepl(genre, movies_df$Genres), "MovieID"]
+  
+  # If we have recommended for this genre already, load that saved data
+  # instead of re-computing
+  if (sum(saved_genre_recoms[[genre]]$MovieID) > 0)
+  {
+    ret = saved_genre_recoms[[genre]]
+    print("reusing system1 genre recoms!")
+  }
+  else
+  {
+    ret = group_by(ratings_df, MovieID)
+    ret = summarize(ret, ratings_per_movie = n(), ave_ratings = round(mean(Rating), dig=3))
+    ret = inner_join(ret, movies_df, by = 'MovieID')
+    ret = filter(ret, ratings_per_movie > 100)
+    ret = filter(ret, MovieID %in% ids_in_genre)
+    if (nrow(ret) < 10) {
+      generic_recommendations = arrange(select(ratings_df, 'Rating', 'MovieID'), desc(Rating))[1:10,]
+      ret = rbind(ret, generic_recommendations)
+    }
+    ret = top_n(ret, 10, ave_ratings)
+    ret = select(ret, 'ave_ratings', 'MovieID')
+    ret = arrange(ret, desc(-ave_ratings))  
+    
+    saved_genre_recoms[[genre]] <<- ret
+  }
+  ret
+}
 ```
 
 ## STEP 1: Center Ratings Matrix 
@@ -110,8 +153,6 @@ RUN CODE FROM HERE
 
 ```{r}
 myIBCF = function(w) {
-  # recom_rankings = list() # we no longer need a list
-  
   recom_rankings = apply(S, 1, function(x){sum(x * w, na.rm=TRUE) / sum( (x * !is.na(w)), na.rm=TRUE)} )
   for (i in 1:length(recom_rankings))
   {

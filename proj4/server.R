@@ -33,7 +33,10 @@ ratings_df = read.csv(paste0(myurl, 'ratings.dat?raw=true'),
                       header = FALSE)
 colnames(ratings_df) = c('UserID', 'MovieID', 'Rating', 'Timestamp')
 
-# !!! read in S from CSV
+# read in S from CSV
+S_post_step3_ = read.csv("S_post_step3.csv")
+S = S_post_step3_[,-1]
+rownames(S) <- S_post_step3_[,1]
 
 get_user_ratings = function(value_list) {
   dat = data.table(MovieID = sapply(strsplit(names(value_list), "_"), 
@@ -67,6 +70,10 @@ system_1_solver = function(genre)
     ret = inner_join(ret, movies_df, by = 'MovieID')
     ret = filter(ret, ratings_per_movie > 100)
     ret = filter(ret, MovieID %in% ids_in_genre)
+    if (nrow(ret) < 10) {
+      generic_recommendations = arrange(select(ratings_df, 'Rating', 'MovieID'), desc(Rating))[1:10,]
+      ret = rbind(ret, generic_recommendations)
+    }
     ret = top_n(ret, 10, ave_ratings)
     ret = select(ret, 'ave_ratings', 'MovieID')
     ret = arrange(ret, desc(-ave_ratings))  
@@ -76,19 +83,23 @@ system_1_solver = function(genre)
   ret
 }
 
-# TODO implement
+myIBCF = function(w) {
+  recom_rankings = apply(S, 1, function(x){sum(x * w, na.rm=TRUE) / sum( (x * !is.na(w)), na.rm=TRUE)} )
+  for (i in 1:length(recom_rankings))
+  {
+    if (!is.na(w[i]))
+    {
+      recom_rankings[i] = NA
+    }
+  }
+  recom_rankings
+}
+
 system_2_solver = function(user_ratings)
 {
-  # create df for top 10 recommendation id's and calculated scores
-  predictions = data.frame(ids = rep(0, 10), scores = rep(0, 10))
-  
-  # #-#-# dummy code, always returns first 10 movies
-  predictions$ids = 1:10
-  predictions$scores = (1:10)/10
-  # #-#-#
-  
-  predictions
-  # be sure to return 10 MoveiID's
+  returned_rankings = myIBCF(user_ratings)
+  non_na_ranks = returned_rankings[!is.na(returned_rankings)]
+  names(head(non_na_ranks[order(-unlist(non_na_ranks))], n=10))
 }
 
 # Actual running server with event callbacks
@@ -132,10 +143,13 @@ shinyServer(function(input, output, session) {
       
       # MovieID's of only movies that the user rated
       value_list = reactiveValuesToList(input)
+      
+      ### do we need this???
       # ratings of only the movies that the user rated
       user_ratings = get_user_ratings(value_list)
+      ### do we need this???
       
-      predictions = system_2_solver(user_ratings)
+      predictions = system_2_solver(value_list)
       user_results = predictions$scores
       user_predicted_ids = predictions$ids
       recom_results = data.table(Rank = 1:10, 
