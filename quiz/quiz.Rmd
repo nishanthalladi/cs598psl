@@ -1,0 +1,145 @@
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+# Quiz 8 Q5
+```{r}
+url = "https://liangfgithub.github.io/Data/Caravan.csv"
+data = read.csv(url, header = TRUE)
+names(data)[ncol(data)] = "Y"
+data$Y = ifelse(data$Y == "Yes", 1, 0)
+data$Y = as.factor(data$Y)
+
+testID = 1:1000
+train = data[-testID, ]
+test = data[testID, ]
+```
+
+## Logistic
+```{r}
+myfit = glm(Y~., data = train, family = binomial(link = "logit"))
+ypred = predict(myfit, newdata = test, type = "response")
+print(length(myfit$coefficients)-1)
+table(test$Y, ypred >= 0.25)
+
+library(pROC)
+round(auc(test$Y, ypred), 3)
+```
+
+## AIC
+```{r}
+library(MASS)
+fit1 = glm(Y ~., data=train, family=binomial)
+fit2 = glm(Y ~ 1, data=train, family=binomial)
+step.model = stepAIC(fit2, direction = "forward", 
+                     scope=list(upper=fit1,lower=fit2), trace=0)
+
+print(length(step.model$coefficients)-1)
+ypred = predict(step.model, newdata = test, type = "response")
+table(test$Y, ypred >= 0.25)
+round(auc(test$Y, ypred), 3)
+```
+
+## BIC
+```{r}
+library(MASS)
+fit1 = glm(Y ~., data=train, family=binomial)
+fit2 = glm(Y ~ 1, data=train, family=binomial)
+step.model = step(fit2, direction = "forward", 
+                     scope=list(upper=fit1,lower=fit2), trace=0, , criterion = "BIC", k = log(nrow(train)))
+
+print(length(step.model$coefficients)-1)
+ypred = predict(step.model, newdata = test, type = "response")
+table(test$Y, ypred >= 0.25)
+round(auc(test$Y, ypred), 3)
+```
+
+## L1
+```{r}
+library(glmnet)
+fit = glmnet(train[, -ncol(train)], train$Y, family = "binomial", 
+              lambda = 0.004)
+fit$df 
+sum(fit$beta !=0)
+
+ypred = predict(fit, newx = as.matrix(test[, -ncol(test)]), type = "response")
+table(test$Y, ypred >= 0.25)
+round(auc(test$Y, ypred), 3)
+```
+# Quiz 9
+
+## Linears
+```{r}
+library(e1071)
+
+url = "https://liangfgithub.github.io/Data/spam.txt"
+spam = read.table(url)
+
+names(spam)[ncol(spam)]="Y"
+spam$Y = as.factor(spam$Y)
+
+testID = c(1:100, 1901:1960)
+spam.test=spam[testID, ]; 
+spam.train=spam[-testID, ];
+```
+
+```{r}
+## Linear SVM  
+svmfit=svm(Y ~., kernel="linear", data=spam.train, cost=1)
+nrow(svmfit$SV)
+table(spam.train$Y, svmfit$fitted)
+print("---")
+svmpred=predict(svmfit, newdata=spam.test)
+table(spam.test$Y, svmpred)
+```
+
+```{r}
+## Linear SVM  
+svmfit=svm(Y ~., kernel="linear", data=spam.train, cost=10)
+nrow(svmfit$SV)
+table(spam.train$Y, svmfit$fitted)
+print("---")
+svmpred=predict(svmfit, newdata=spam.test)
+table(spam.test$Y, svmpred)
+```
+
+```{r}
+## Linear SVM  
+svmfit=svm(Y ~., kernel="linear", data=spam.train, cost=50)
+nrow(svmfit$SV)
+table(spam.train$Y, svmfit$fitted)
+print("---")
+svmpred=predict(svmfit, newdata=spam.test)
+table(spam.test$Y, svmpred)
+```
+
+## Gaussians
+```{r}
+## Gaussian SVM  
+svmfit=svm(Y ~., kernel="radial", data=spam.train, cost=1)
+nrow(svmfit$SV)
+table(spam.train$Y, svmfit$fitted)
+print("---")
+svmpred=predict(svmfit, newdata=spam.test)
+table(spam.test$Y, svmpred)
+```
+
+```{r}
+## Gaussian SVM  
+svmfit=svm(Y ~., kernel="radial", data=spam.train, cost=10)
+nrow(svmfit$SV)
+table(spam.train$Y, svmfit$fitted)
+print("---")
+svmpred=predict(svmfit, newdata=spam.test)
+table(spam.test$Y, svmpred)
+```
+
+```{r}
+## Gaussian SVM  
+svmfit=svm(Y ~., kernel="radial", data=spam.train, cost=50)
+nrow(svmfit$SV)
+table(spam.train$Y, svmfit$fitted)
+print("---")
+svmpred=predict(svmfit, newdata=spam.test)
+table(spam.test$Y, svmpred)
+```
