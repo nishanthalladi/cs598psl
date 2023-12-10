@@ -33,8 +33,7 @@ ratings_df = read.csv(paste0(myurl, 'ratings.dat?raw=true'),
                       header = FALSE)
 colnames(ratings_df) = c('UserID', 'MovieID', 'Rating', 'Timestamp')
 
-# read in ratings matrix
-
+# !!! read in S from CSV
 
 get_user_ratings = function(value_list) {
   dat = data.table(MovieID = sapply(strsplit(names(value_list), "_"), 
@@ -89,6 +88,7 @@ system_2_solver = function(user_ratings)
   # #-#-#
   
   predictions
+  # be sure to return 10 MoveiID's
 }
 
 # Actual running server with event callbacks
