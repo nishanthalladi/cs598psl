@@ -9,11 +9,6 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Ethan Cook" />
-
-<meta name="date" content="2023-12-02" />
-
-<title>mymain</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -349,11 +344,6 @@ display: none;
 <div id="header">
 
 
-
-<h1 class="title toc-ignore">mymain</h1>
-<h4 class="author">Ethan Cook</h4>
-<h4 class="date">2023-12-02</h4>
-
 </div>
 
 
@@ -425,6 +415,9 @@ less than 10 movies in that genre with more than 100 ratings, we append
 to that list with the top rated movies in general with no ratings
 minimum until the list is size 10. Below we have provided a code
 implementation of the proposal as it runs on our webpage.</p>
+<p>We also save the top 10 recommendations for any given genre once
+they’ve already been calculated, so if the same genre is selected again,
+no computation is needed.</p>
 <pre class="r"><code># Based on selected genre, chooses 10 popular recommendations
 system_1_solver = function(genre)
 {
@@ -525,6 +518,10 @@ rownames(S) &lt;- S_post_step3_[,1]</code></pre>
 </div>
 <div id="these-functions-run-on-the-server" class="section level3">
 <h3>These functions run on the server</h3>
+<p>If less than 10 recommendations are returned from system 2, we choose
+movies with high average ratings from the movies data that are not
+related to the users ratings, and fill in the missing
+recommendations.</p>
 <pre class="r"><code>process_user_rating_output = function(user_ratings)
 {
   # Pull a single sample user from ratings matrix and set all values to NA

@@ -5,6 +5,7 @@ library(recommenderlab)
 #library(DT)
 library(data.table)
 library(reshape2)
+#library(rsconnect)
 
 myurl = "https://liangfgithub.github.io/MovieData/"
 

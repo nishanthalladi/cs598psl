@@ -69,6 +69,8 @@ ratings_mat = read.csv("ratings_matrix.csv")
 
 We propose a recommendation system that, given a genre, returns the the top ten highly-rated movies in that genre, given that there are more than 100 ratings for each movie that we are recommending. If there are less than 10 movies in that genre with more than 100 ratings, we append to that list with the top rated movies in general with no ratings minimum until the list is size 10. Below we have provided a code implementation of the proposal as it runs on our webpage.
 
+We also save the top 10 recommendations for any given genre once they've already been calculated, so if the same genre is selected again, no computation is needed.
+
 ```{r}
 # Based on selected genre, chooses 10 popular recommendations
 system_1_solver = function(genre)
@@ -171,6 +173,7 @@ rownames(S) <- S_post_step3_[,1]
 ```
 
 ### These functions run on the server
+If less than 10 recommendations are returned from system 2, we choose movies with high average ratings from the movies data that are not related to the users ratings, and fill in the missing recommendations.
 ```{r}
 process_user_rating_output = function(user_ratings)
 {
