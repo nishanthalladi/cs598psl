@@ -95,11 +95,57 @@ myIBCF = function(w) {
   recom_rankings
 }
 
+process_user_rating_output = function(user_ratings)
+{
+  # Pull a single sample user from ratings matrix and set all values to NA
+  ratings_mat_sample = read.csv("ratings_matrix.csv", nrows = 1)
+  ratings_mat_sample[!is.na(ratings_mat_sample)] = NA
+
+  # need to remove strange NA movie id
+  temp = user_ratings[-1,]
+
+  movie_ids = temp$MovieID
+  for (id in 1:length(movie_ids))
+  {
+    text_id = paste("m", as.character(movie_ids[id]), sep="")
+    ratings_mat_sample[text_id] = temp$Rating[id]
+  }
+  # convert to numeric vector to save processing time by like 30,000%
+  as.numeric(ratings_mat_sample)
+}
+
 system_2_solver = function(user_ratings)
 {
-  returned_rankings = myIBCF(user_ratings)
+  processed_user_ratings = process_user_rating_output(user_ratings)
+  # getting this far
+  returned_rankings = myIBCF(processed_user_ratings)
   non_na_ranks = returned_rankings[!is.na(returned_rankings)]
-  names(head(non_na_ranks[order(-unlist(non_na_ranks))], n=10))
+  
+  # If less than 10 recommendations, put some other movies in
+  if (length(non_na_ranks) < 10) {
+    nrank = 10 - length(non_na_ranks)
+    generic_recommendations = arrange(select(ratings_df, 'Rating', 'MovieID'), desc(Rating))[1:nrank,]
+    vector_generics = rep(1, nrank)#select(generic_recommendations, 'Rating')[['Rating']]
+    vec_names = select(generic_recommendations, 'MovieID')[['MovieID']]
+    for (id in 1:length(vec_names))
+    {
+      vec_names[id] = paste("m", as.character(vec_names[id]), sep="")
+    }
+    names(vector_generics) = vec_names
+    full_ranks = c(non_na_ranks, vector_generics)
+    print("less than 10 recoms, injecting...")
+  }
+  else
+  {
+    full_ranks = non_na_ranks
+  }
+  
+  # format results as a dataframe with MovieIDs and Scores
+  return_df = data.frame(
+    ids = names(head(full_ranks[order(-unlist(full_ranks))], n=10)),
+    scores = head(full_ranks[order(-unlist(full_ranks))], n=10)
+  )
+  return_df
 }
 
 # Actual running server with event callbacks
@@ -144,14 +190,13 @@ shinyServer(function(input, output, session) {
       # MovieID's of only movies that the user rated
       value_list = reactiveValuesToList(input)
       
-      ### do we need this???
-      # ratings of only the movies that the user rated
+      # ratings and movieID of only the movies that the user rated
       user_ratings = get_user_ratings(value_list)
-      ### do we need this???
-      
-      predictions = system_2_solver(value_list)
+
+      predictions = system_2_solver(user_ratings)
       user_results = predictions$scores
-      user_predicted_ids = predictions$ids
+      # convert string m123 format back to numeric 123 format for movie id's
+      user_predicted_ids = as.numeric(substring(predictions$ids, 2))
       recom_results = data.table(Rank = 1:10, 
                                      MovieID = movies_df$MovieID[user_predicted_ids], 
                                      Title = movies_df$Title[user_predicted_ids], 

@@ -1,8 +1,3 @@
-# All the code in this file needs to be copied to your Shiny app, and you need
-# to call `withBusyIndicatorUI()` and `withBusyIndicatorServer()` in your app.
-# You can also include the `appCSS` in your UI, as the example app shows.
-
-# =============================================
 
 genres <<- c("Action", "Adventure", "Animation", 
              "Children's", "Comedy", "Crime",

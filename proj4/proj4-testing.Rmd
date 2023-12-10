@@ -5,23 +5,25 @@ date: "2023-12-02"
 output: html_document
 ---
 
+# Project 4
+## Nishanth Alladi (nalladi2), Ethan Cook (elcook3), Davy Ji (davyji2)
+Each member contributed to several pair programming sessions where the entirety of the report was written. Each member contributed to both theorizing solutions and in implementing code.
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Import Libraries
+## Import Libraries
 ```{r}
 library(dplyr)
 library(ggplot2)
-#library(recommenderlab)
-#library(DT)
 library(data.table)
 library(reshape2)
 library(coop)
 ```
 
-# Load Data
-## Ratings Data (ratings)
+## Load Data
+### Ratings Data (ratings)
 ```{r}
 myurl = "https://liangfgithub.github.io/MovieData/"
 
@@ -33,7 +35,7 @@ ratings = read.csv(paste0(myurl, 'ratings.dat?raw=true'),
 colnames(ratings) = c('UserID', 'MovieID', 'Rating', 'Timestamp')
 ```
 
-## Movies Data (movies)
+### Movies Data (movies)
 ```{r}
 movies = readLines(paste0(myurl, 'movies.dat?raw=true'))
 movies = strsplit(movies, split = "::", fixed = TRUE, useBytes = TRUE)
@@ -43,16 +45,14 @@ colnames(movies) = c('MovieID', 'Title', 'Genres')
 movies$MovieID = as.integer(movies$MovieID)
 
 # convert accented characters
-movies$Title[73]
 movies$Title = iconv(movies$Title, "latin1", "UTF-8")
-movies$Title[73]
 
 # extract year
 movies$Year = as.numeric(unlist(
   lapply(movies$Title, function(x) substr(x, nchar(x)-4, nchar(x)-1))))
 ```
 
-## User Data (users)
+### User Data (users)
 ```{r}
 users = read.csv(paste0(myurl, 'users.dat?raw=true'),
                  sep = ':', header = FALSE)
@@ -60,14 +60,14 @@ users = users[, -c(2,4,6,8)] # skip columns
 colnames(users) = c('UserID', 'Gender', 'Age', 'Occupation', 'Zip-code')
 ```
 
-## Ratings Matrix
+### Ratings Matrix
 ```{r}
 ratings_mat = read.csv("ratings_matrix.csv")
 ```
 
 # System I: 
 
-We propose a recommendation system that, given a genre, returns the the top ten highly-rated movies in that genre, given that there are more than 100 ratings for each movie that we are recommending. If there are less than 10 movies in that genre with more than 100 ratings, we append to that list with the top rated movies in general with no ratings minimum until the list is size 10.
+We propose a recommendation system that, given a genre, returns the the top ten highly-rated movies in that genre, given that there are more than 100 ratings for each movie that we are recommending. If there are less than 10 movies in that genre with more than 100 ratings, we append to that list with the top rated movies in general with no ratings minimum until the list is size 10. Below we have provided a code implementation of the proposal as it runs on our webpage.
 
 ```{r}
 # Based on selected genre, chooses 10 popular recommendations
@@ -114,6 +114,7 @@ system_1_solver = function(genre)
 row_means = rowMeans(ratings_mat, na.rm=TRUE)
 ratings_mat_centered = ratings_mat - row_means
 ```
+
 ## STEP 2: Cosine Similarity
 ```{r}
 S = coop::cosine(as.matrix(ratings_mat_centered), use = "pairwise.complete.obs")
@@ -145,12 +146,7 @@ for (r in 1:nrow(S)) {
 write.csv(S, file="S_post_step3.csv")
 ```
 
-!!!!
-RUN CODE FROM HERE
-!!!!
-
 ## STEP 4: myIBCF
-
 ```{r}
 myIBCF = function(w) {
   recom_rankings = apply(S, 1, function(x){sum(x * w, na.rm=TRUE) / sum( (x * !is.na(w)), na.rm=TRUE)} )
@@ -161,32 +157,93 @@ myIBCF = function(w) {
       recom_rankings[i] = NA
     }
   }
-
   recom_rankings
 }
 ```
 
+### load data for testing IBCF
 ```{r}
 ratings_mat_with_rownames = read.csv("ratings_matrix.csv", row.names = 1)
-```
 
-## Test running IBCF
-```{r}
 S_post_step3_ = read.csv("S_post_step3.csv")
 S = S_post_step3_[,-1]
 rownames(S) <- S_post_step3_[,1]
-
-start_time = Sys.time()
-print("start time:")
-print(start_time)
-
-returned_rankings = myIBCF(ratings_mat_with_rownames["u1181",]) # dont bring to server.R
-
-print("algorithm time:")
-print(Sys.time() - start_time)
-
-non_na_ranks = returned_rankings[!is.na(returned_rankings)]
-head(non_na_ranks[order(-unlist(non_na_ranks))], n=20)
-
 ```
+
+### These functions run on the server
+```{r}
+process_user_rating_output = function(user_ratings)
+{
+  # Pull a single sample user from ratings matrix and set all values to NA
+  ratings_mat_sample = read.csv("ratings_matrix.csv", nrows = 1)
+  ratings_mat_sample[!is.na(ratings_mat_sample)] = NA
+
+  # need to remove strange NA movie id
+  temp = user_ratings[-1,]
+
+  movie_ids = temp$MovieID
+  for (id in 1:length(movie_ids))
+  {
+    text_id = paste("m", as.character(movie_ids[id]), sep="")
+    ratings_mat_sample[text_id] = temp$Rating[id]
+  }
+  # convert to numeric vector to save processing time by like 30,000%
+  as.numeric(ratings_mat_sample)
+}
+
+print_top_10 = function(returned_rankings)
+{
+  non_na_ranks = returned_rankings[!is.na(returned_rankings)]
+  
+  # If less than 10 recommendations, put some other movies in
+  if (length(non_na_ranks) < 10) {
+    nrank = 10 - length(non_na_ranks)
+    generic_recommendations = arrange(select(ratings_df, 'Rating', 'MovieID'), desc(Rating))[1:nrank,]
+    vector_generics = rep(1, nrank)#select(generic_recommendations, 'Rating')[['Rating']]
+    vec_names = select(generic_recommendations, 'MovieID')[['MovieID']]
+    for (id in 1:length(vec_names))
+    {
+      vec_names[id] = paste("m", as.character(vec_names[id]), sep="")
+    }
+    names(vector_generics) = vec_names
+    full_ranks = c(non_na_ranks, vector_generics)
+    print("less than 10 recoms, injecting...")
+  }
+  else
+  {
+    full_ranks = non_na_ranks
+  }
+  
+  # format results as a dataframe with MovieIDs and Scores
+  return_df = data.frame(
+    ids = names(head(full_ranks[order(-unlist(full_ranks))], n=10)),
+    scores = head(full_ranks[order(-unlist(full_ranks))], n=10)
+  )
+  print(return_df)
+}
+```
+
+### Test user 1181
+```{r}
+returned_rankings = myIBCF(as.numeric(ratings_mat_with_rownames["u1181",])) # dont bring to server.R
+print_top_10(returned_rankings)
+```
+
+### Test user 1351
+```{r}
+returned_rankings = myIBCF(as.numeric(ratings_mat_with_rownames["u1351",])) # dont bring to server.R
+print_top_10(returned_rankings)
+```
+
+### Create and test hypothetical user
+```{r}
+ratings_mat_sample = read.csv("ratings_matrix.csv", nrows = 1)
+ratings_mat_sample[!is.na(ratings_mat_sample)] = NA
+ratings_mat_sample["m1613"] = 5
+ratings_mat_sample["m1755"] = 4
+returned_rankings = myIBCF(as.numeric(ratings_mat_sample)) # dont bring to server.R
+print_top_10(returned_rankings)
+```
+
+
 
